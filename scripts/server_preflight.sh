@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Read-only gate for a shared multi-GPU host. It never kills or modifies other jobs.
-PROJECT_ROOT="${PROJECT_ROOT:-/data2/jiangjiaqi}"
+PROJECT_ROOT="${PROJECT_ROOT:-/home/jiangjiaqi/zcdai}"
 TARGET_GPU_UUID="${TARGET_GPU_UUID:-}"
 MIN_HOST_FREE_GIB="${MIN_HOST_FREE_GIB:-64}"
 MIN_CGROUP_FREE_GIB="${MIN_CGROUP_FREE_GIB:-32}"

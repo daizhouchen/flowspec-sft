@@ -82,10 +82,10 @@ uv sync --extra train
 CUDA_VISIBLE_DEVICES=<SELECTED_GPU_UUID_FROM_PREFLIGHT> \
 OMP_NUM_THREADS=2 TOKENIZERS_PARALLELISM=false uv run python scripts/train_qlora.py \
   --model Qwen/Qwen3-0.6B \
-  --output /data2/jiangjiaqi/flowspec-sft/artifacts/qwen3-0.6b-qlora
+  --output /home/jiangjiaqi/zcdai/flowspec-sft/artifacts/qwen3-0.6b-qlora
 ```
 
-门禁会在当前容器可见的 GPU 中自动选择空闲卡。默认要求 `/data2/jiangjiaqi` 已挂载、主机可用内存不少于 64 GiB、cgroup 余量不少于 32 GiB、磁盘余量不少于 100 GiB、1 分钟负载低于可见 CPU 数量的 75%，并在 10 秒两次采样中确认所选 GPU 空闲显存不少于 25 GiB且利用率不高于 5%。任一条件不满足时停止，不降低门槛或自动重试。
+门禁会在当前容器可见的 GPU 中自动选择空闲卡。默认要求 `/home/jiangjiaqi/zcdai` 可用、主机可用内存不少于 64 GiB、cgroup 余量不少于 32 GiB、磁盘余量不少于 100 GiB、1 分钟负载低于可见 CPU 数量的 75%，并在 10 秒两次采样中确认所选 GPU 空闲显存不少于 25 GiB且利用率不高于 5%。任一条件不满足时停止，不降低门槛或自动重试。
 
 生成与评测预测：
 
