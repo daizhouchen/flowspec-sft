@@ -85,10 +85,10 @@ def repair_workflow(payload: dict[str, Any], issues: list[ValidationIssue]) -> t
     nodes = [dict(node) for node in repaired.get("nodes", []) if isinstance(node, dict)]
     valid_ids = {node.get("id") for node in nodes}
     for node in nodes:
-        before = list(node.get("depends_on", []))
+        raw_dependencies = node.get("depends_on")
+        before = list(raw_dependencies) if isinstance(raw_dependencies, list) else []
         node["depends_on"] = [dep for dep in before if dep in valid_ids and dep != node.get("id")]
         if before != node["depends_on"]:
             logs.append(f"移除 {node.get('id')} 的悬空或自引用依赖")
     repaired["nodes"] = nodes
     return repaired, logs
-

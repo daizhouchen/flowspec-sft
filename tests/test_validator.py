@@ -1,4 +1,4 @@
-from flowspec.validator import validate_workflow
+from flowspec.validator import repair_workflow, validate_workflow
 
 
 def valid_workflow():
@@ -44,3 +44,9 @@ def test_dangling_and_self_dependency_are_rejected():
     assert "dangling_dependency" in codes
     assert "self_dependency" in codes
 
+
+def test_repair_treats_null_dependencies_as_empty_list():
+    payload = valid_workflow()
+    payload["nodes"][1]["depends_on"] = None
+    repaired, _ = repair_workflow(payload, [])
+    assert repaired["nodes"][1]["depends_on"] == []
