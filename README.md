@@ -79,10 +79,13 @@ npm run dev
 ```bash
 bash scripts/server_preflight.sh
 uv sync --extra train
-uv run python scripts/train_qlora.py \
+CUDA_VISIBLE_DEVICES=GPU-e4099e8f-7881-b850-cbc8-a9cfe310809c \
+OMP_NUM_THREADS=2 TOKENIZERS_PARALLELISM=false uv run python scripts/train_qlora.py \
   --model Qwen/Qwen3-0.6B \
   --output artifacts/qwen3-0.6b-qlora
 ```
+
+门禁默认要求主机可用内存不少于 64 GiB、cgroup 余量不少于 32 GiB、磁盘余量不少于 100 GiB，并在 10 秒两次采样中确认目标 GPU 空闲显存不少于 25 GiB且利用率不高于 5%。任一条件不满足时停止，不降低门槛或自动重试。
 
 生成与评测预测：
 
