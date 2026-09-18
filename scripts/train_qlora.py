@@ -130,6 +130,7 @@ def main() -> None:
         report_to="none",
         seed=20260918,
         dataloader_num_workers=0,
+        label_names=["labels"],
         save_total_limit=2,
     )
     trainer = Trainer(
