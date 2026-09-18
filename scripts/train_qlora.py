@@ -33,6 +33,10 @@ def main() -> None:
     parser.add_argument("--dev", type=Path, default=Path("data/generated/dev.jsonl"))
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-length", type=int, default=2048)
+    parser.add_argument("--train-limit", type=int, default=0)
+    parser.add_argument("--dev-limit", type=int, default=0)
+    parser.add_argument("--epochs", type=float, default=2.0)
+    parser.add_argument("--max-steps", type=int, default=-1)
     args = parser.parse_args()
 
     quantization = BitsAndBytesConfig(
@@ -59,12 +63,19 @@ def main() -> None:
         task_type="CAUSAL_LM",
     )
     model = get_peft_model(model, config)
+    model.config.use_cache = False
 
     def tokenize(batch):
         return tokenizer(batch["text"], truncation=True, max_length=args.max_length, padding=False)
 
-    train = Dataset.from_list(load_rows(args.train)).map(tokenize, batched=True, remove_columns=["text"])
-    dev = Dataset.from_list(load_rows(args.dev)).map(tokenize, batched=True, remove_columns=["text"])
+    train_rows = load_rows(args.train)
+    dev_rows = load_rows(args.dev)
+    if args.train_limit > 0:
+        train_rows = train_rows[: args.train_limit]
+    if args.dev_limit > 0:
+        dev_rows = dev_rows[: args.dev_limit]
+    train = Dataset.from_list(train_rows).map(tokenize, batched=True, remove_columns=["text"])
+    dev = Dataset.from_list(dev_rows).map(tokenize, batched=True, remove_columns=["text"])
     collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     training = TrainingArguments(
         output_dir=str(args.output),
@@ -72,7 +83,8 @@ def main() -> None:
         per_device_eval_batch_size=1,
         gradient_accumulation_steps=16,
         learning_rate=2e-4,
-        num_train_epochs=2,
+        num_train_epochs=args.epochs,
+        max_steps=args.max_steps,
         logging_steps=10,
         eval_strategy="steps",
         eval_steps=100,
