@@ -1,0 +1,10 @@
+{
+  "total": 2200,
+  "train": 1600,
+  "dev": 250,
+  "test": 250,
+  "challenge": 100,
+  "test_review": "pending_user_review",
+  "challenge_review": "pending_user_review",
+  "seed": 20260918
+}

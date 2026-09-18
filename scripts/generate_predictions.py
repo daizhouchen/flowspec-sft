@@ -1,0 +1,104 @@
+"""Generate zero-shot, few-shot or adapter predictions for a fixed FlowSpec split."""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import time
+from pathlib import Path
+
+SYSTEM = """你是工作流编译器。只输出一个 JSON 对象，必须符合 WorkflowSpec v1。
+字段包括 schema_version、name、description、trigger、nodes。节点需包含 id、tool、arguments、
+depends_on、when、requires_approval、retry、on_failure。不得输出解释或 Markdown。"""
+
+
+def load_jsonl(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
+
+
+def extract_json(text: str) -> dict | None:
+    text = text.strip().removeprefix("```json").removesuffix("```").strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+        if not match:
+            return None
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            return None
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--model", default="Qwen/Qwen3-0.6B")
+    parser.add_argument("--adapter", type=Path)
+    parser.add_argument("--mode", choices=["zero-shot", "few-shot", "sft"], default="zero-shot")
+    parser.add_argument("--input", type=Path, default=Path("data/generated/test.jsonl"))
+    parser.add_argument("--few-shot-source", type=Path, default=Path("data/generated/train.jsonl"))
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--limit", type=int)
+    parser.add_argument("--max-new-tokens", type=int, default=1200)
+    args = parser.parse_args()
+
+    import torch
+    from peft import PeftModel
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model,
+        torch_dtype="auto",
+        device_map="auto",
+        trust_remote_code=True,
+    )
+    if args.adapter:
+        model = PeftModel.from_pretrained(model, args.adapter)
+    model.eval()
+
+    demonstrations = load_jsonl(args.few_shot_source)[:2] if args.mode == "few-shot" else []
+    rows = load_jsonl(args.input)
+    if args.limit:
+        rows = rows[: args.limit]
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+
+    with args.output.open("w", encoding="utf-8") as handle:
+        for row in rows:
+            messages = [{"role": "system", "content": SYSTEM}]
+            for demo in demonstrations:
+                messages.extend(
+                    [
+                        {"role": "user", "content": demo["instruction"]},
+                        {
+                            "role": "assistant",
+                            "content": json.dumps(demo["output"], ensure_ascii=False),
+                        },
+                    ]
+                )
+            messages.append({"role": "user", "content": row["instruction"]})
+            prompt = tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
+            )
+            inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+            started = time.perf_counter()
+            with torch.inference_mode():
+                generated = model.generate(
+                    **inputs,
+                    max_new_tokens=args.max_new_tokens,
+                    do_sample=False,
+                    pad_token_id=tokenizer.eos_token_id,
+                )
+            text = tokenizer.decode(generated[0, inputs.input_ids.shape[1] :], skip_special_tokens=True)
+            record = {
+                "id": row["id"],
+                "mode": args.mode,
+                "prediction": extract_json(text),
+                "raw_text": text,
+                "latency_ms": round((time.perf_counter() - started) * 1000, 2),
+            }
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+if __name__ == "__main__":
+    main()

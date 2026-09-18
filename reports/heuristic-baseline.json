@@ -1,0 +1,58 @@
+{
+  "test": {
+    "count": 250,
+    "compiler": "heuristic-v1",
+    "schema_valid_rate": 1.0,
+    "dag_valid_rate": 1.0,
+    "sandbox_pass_rate": 1.0,
+    "tool_f1": 0.873,
+    "argument_slot_f1": 0.8661,
+    "dependency_edge_f1": 0.775,
+    "exact_structure_rate": 0.0,
+    "errors": {}
+  },
+  "challenge": {
+    "count": 100,
+    "compiler": "heuristic-v1",
+    "schema_valid_rate": 1.0,
+    "dag_valid_rate": 1.0,
+    "sandbox_pass_rate": 1.0,
+    "tool_f1": 0.4067,
+    "argument_slot_f1": 0.4331,
+    "dependency_edge_f1": 0.0,
+    "exact_structure_rate": 0.0,
+    "errors": {}
+  },
+  "leakage": {
+    "families": {
+      "train": [
+        "aggregate_chart_email",
+        "collect_classify_report",
+        "risk_approval_report",
+        "search_summarize_notify"
+      ],
+      "dev": [
+        "records_legal_export",
+        "translate_approval_email"
+      ],
+      "test": [
+        "search_risk_approval",
+        "sentiment_report_message"
+      ],
+      "challenge": [
+        "challenge_composition"
+      ]
+    },
+    "overlaps": {
+      "train:dev": [],
+      "train:test": [],
+      "train:challenge": [],
+      "dev:test": [],
+      "dev:challenge": [],
+      "test:challenge": []
+    },
+    "passed": true
+  },
+  "review_status": "pending_user_review",
+  "model_baselines": "pending_gpu_run"
+}

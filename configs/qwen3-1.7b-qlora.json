@@ -1,0 +1,15 @@
+{
+  "model": "Qwen/Qwen3-1.7B",
+  "requires_resource_gate": true,
+  "quantization": "nf4-4bit",
+  "lora_rank": 16,
+  "lora_alpha": 32,
+  "lora_dropout": 0.05,
+  "max_length": 2048,
+  "batch_size": 1,
+  "gradient_accumulation": 16,
+  "epochs": 2,
+  "learning_rate": 0.0002,
+  "seed": 20260918,
+  "num_workers": 0
+}
