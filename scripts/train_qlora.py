@@ -12,18 +12,18 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
-    DataCollatorForLanguageModeling,
+    DataCollatorForSeq2Seq,
     Trainer,
     TrainingArguments,
 )
 
+SYSTEM = """你是工作流编译器。只输出一个 JSON 对象，必须符合 WorkflowSpec v1。
+字段包括 schema_version、name、description、trigger、nodes。节点需包含 id、tool、arguments、
+depends_on、when、requires_approval、retry、on_failure。不得输出解释或 Markdown。"""
+
 
 def load_rows(path: Path) -> list[dict]:
-    rows = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        item = json.loads(line)
-        rows.append({"text": f"<|user|>\n{item['instruction']}\n<|assistant|>\n{json.dumps(item['output'], ensure_ascii=False)}"})
-    return rows
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
 
 
 def main() -> None:
@@ -65,8 +65,37 @@ def main() -> None:
     model = get_peft_model(model, config)
     model.config.use_cache = False
 
-    def tokenize(batch):
-        return tokenizer(batch["text"], truncation=True, max_length=args.max_length, padding=False)
+    def tokenize(item):
+        messages = [
+            {"role": "system", "content": SYSTEM},
+            {"role": "user", "content": item["instruction"]},
+        ]
+        prompt_ids = tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            add_generation_prompt=True,
+            enable_thinking=False,
+        )
+        full_ids = tokenizer.apply_chat_template(
+            messages
+            + [
+                {
+                    "role": "assistant",
+                    "content": json.dumps(item["output"], ensure_ascii=False),
+                }
+            ],
+            tokenize=True,
+            add_generation_prompt=False,
+            enable_thinking=False,
+        )
+        full_ids = full_ids[: args.max_length]
+        prompt_length = min(len(prompt_ids), len(full_ids))
+        labels = [-100] * prompt_length + full_ids[prompt_length:]
+        return {
+            "input_ids": full_ids,
+            "attention_mask": [1] * len(full_ids),
+            "labels": labels,
+        }
 
     train_rows = load_rows(args.train)
     dev_rows = load_rows(args.dev)
@@ -74,9 +103,16 @@ def main() -> None:
         train_rows = train_rows[: args.train_limit]
     if args.dev_limit > 0:
         dev_rows = dev_rows[: args.dev_limit]
-    train = Dataset.from_list(train_rows).map(tokenize, batched=True, remove_columns=["text"])
-    dev = Dataset.from_list(dev_rows).map(tokenize, batched=True, remove_columns=["text"])
-    collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+    train = Dataset.from_list(train_rows)
+    dev = Dataset.from_list(dev_rows)
+    train = train.map(tokenize, remove_columns=train.column_names)
+    dev = dev.map(tokenize, remove_columns=dev.column_names)
+    collator = DataCollatorForSeq2Seq(
+        tokenizer=tokenizer,
+        model=model,
+        padding=True,
+        label_pad_token_id=-100,
+    )
     training = TrainingArguments(
         output_dir=str(args.output),
         per_device_train_batch_size=1,
