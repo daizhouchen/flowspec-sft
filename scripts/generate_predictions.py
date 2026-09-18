@@ -39,6 +39,7 @@ def main() -> None:
     parser.add_argument("--few-shot-source", type=Path, default=Path("data/generated/train.jsonl"))
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--max-new-tokens", type=int, default=1200)
     args = parser.parse_args()
 
@@ -47,6 +48,9 @@ def main() -> None:
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "left"
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
         torch_dtype="auto",
@@ -64,23 +68,31 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
     with args.output.open("w", encoding="utf-8") as handle:
-        for row in rows:
-            messages = [{"role": "system", "content": SYSTEM}]
-            for demo in demonstrations:
-                messages.extend(
-                    [
-                        {"role": "user", "content": demo["instruction"]},
-                        {
-                            "role": "assistant",
-                            "content": json.dumps(demo["output"], ensure_ascii=False),
-                        },
-                    ]
+        for start in range(0, len(rows), args.batch_size):
+            batch = rows[start : start + args.batch_size]
+            prompts = []
+            for row in batch:
+                messages = [{"role": "system", "content": SYSTEM}]
+                for demo in demonstrations:
+                    messages.extend(
+                        [
+                            {"role": "user", "content": demo["instruction"]},
+                            {
+                                "role": "assistant",
+                                "content": json.dumps(demo["output"], ensure_ascii=False),
+                            },
+                        ]
+                    )
+                messages.append({"role": "user", "content": row["instruction"]})
+                prompts.append(
+                    tokenizer.apply_chat_template(
+                        messages,
+                        tokenize=False,
+                        add_generation_prompt=True,
+                        enable_thinking=False,
+                    )
                 )
-            messages.append({"role": "user", "content": row["instruction"]})
-            prompt = tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
-            )
-            inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+            inputs = tokenizer(prompts, return_tensors="pt", padding=True).to(model.device)
             started = time.perf_counter()
             with torch.inference_mode():
                 generated = model.generate(
@@ -89,15 +101,20 @@ def main() -> None:
                     do_sample=False,
                     pad_token_id=tokenizer.eos_token_id,
                 )
-            text = tokenizer.decode(generated[0, inputs.input_ids.shape[1] :], skip_special_tokens=True)
-            record = {
-                "id": row["id"],
-                "mode": args.mode,
-                "prediction": extract_json(text),
-                "raw_text": text,
-                "latency_ms": round((time.perf_counter() - started) * 1000, 2),
-            }
-            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+            batch_latency_ms = (time.perf_counter() - started) * 1000
+            generated_texts = tokenizer.batch_decode(
+                generated[:, inputs.input_ids.shape[1] :],
+                skip_special_tokens=True,
+            )
+            for row, text in zip(batch, generated_texts, strict=True):
+                record = {
+                    "id": row["id"],
+                    "mode": args.mode,
+                    "prediction": extract_json(text),
+                    "raw_text": text,
+                    "latency_ms": round(batch_latency_ms / len(batch), 2),
+                }
+                handle.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 if __name__ == "__main__":
