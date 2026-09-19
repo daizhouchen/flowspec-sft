@@ -2,7 +2,7 @@
 
 > 自然语言工作流编译、校验与小模型微调 · Natural language → validated workflow DAG
 
-[在线沙箱 Demo](https://daizhouchen.github.io/flowspec-sft/) · [30 秒操作视频](docs/assets/demo.webm) · [数据卡](DATA_CARD.md) · [模型卡](MODEL_CARD.md)
+[在线沙箱 Demo](https://daizhouchen.github.io/flowspec-sft/) · [30 秒操作视频](docs/assets/demo.webm) · [数据卡](DATA_CARD.md) · [模型卡](MODEL_CARD.md) · [错误分析](docs/error-analysis.md)
 
 ![FlowSpec demo](docs/assets/demo.png)
 
