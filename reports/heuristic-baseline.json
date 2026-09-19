@@ -62,5 +62,5 @@
     "passed": true
   },
   "review_status": "pending_user_review",
-  "model_baselines": "pending_gpu_run"
+  "model_baselines": "completed_qwen3_1_7b_qlora"
 }

@@ -68,19 +68,28 @@ def main() -> None:
 
     root = args.project.resolve()
     reports = root / "reports"
+    diverse_prefix = "qwen3-1.7b-diverse"
     schema_prefix = "qwen3-1.7b-schema"
     legacy_prefix = "qwen3-1.7b"
     prefix = args.run_prefix or (
-        schema_prefix
-        if (reports / f"{schema_prefix}-sft-test-metrics.json").exists()
-        else legacy_prefix
+        diverse_prefix
+        if (reports / f"{diverse_prefix}-sft-test-metrics.json").exists()
+        else (
+            schema_prefix
+            if (reports / f"{schema_prefix}-sft-test-metrics.json").exists()
+            else legacy_prefix
+        )
     )
     artifact = root / (
         args.artifact
         or Path(
-            "artifacts/qwen3-1.7b-qlora-schema"
-            if prefix == schema_prefix
-            else "artifacts/qwen3-1.7b-qlora-compact"
+            "artifacts/qwen3-1.7b-qlora-diverse"
+            if prefix == diverse_prefix
+            else (
+                "artifacts/qwen3-1.7b-qlora-schema"
+                if prefix == schema_prefix
+                else "artifacts/qwen3-1.7b-qlora-compact"
+            )
         )
     )
     heuristic = read_json(reports / "heuristic-baseline.json") or {}
@@ -93,6 +102,7 @@ def main() -> None:
     metrics = {name: read_json(path) for name, path in named_paths.items()}
     train = read_json(artifact / "train_results.json")
     evaluation = read_json(artifact / "eval_results.json")
+    deployment_verification = read_json(reports / "e2e-verification.json")
     inference = {
         name.removesuffix("_test"): read_json(path.with_name(path.name.replace("-metrics", ".meta")))
         for name, path in named_paths.items()
@@ -130,6 +140,7 @@ def main() -> None:
         "metrics": metrics,
         "inference": inference,
         "quantized_model": quantized,
+        "deployment_verification": deployment_verification,
         "sandbox_gain_vs_few_shot": sandbox_delta,
         "semantic_gain_vs_few_shot": semantic_delta,
         "target_checks": target_checks,
@@ -177,6 +188,21 @@ def main() -> None:
                 f"- 文件：`{quantized['path']}`",
                 f"- 大小：`{quantized['bytes']}` bytes",
                 f"- SHA-256：`{quantized['sha256']}`",
+            ]
+        )
+    if deployment_verification:
+        lines.extend(
+            [
+                "",
+                "## 端到端部署验证",
+                "",
+                f"- CPU 单轮冒烟：`{deployment_verification['cpu_smoke']['wall_ms']}` ms",
+                f"- FastAPI 编译：`{deployment_verification['api_compile']['elapsed_ms']}` ms",
+                f"- 工作流节点：`{deployment_verification['api_compile']['nodes']}`",
+                (
+                    f"- 校验 / 沙箱：`{deployment_verification['api_compile']['validation']}` / "
+                    f"`{deployment_verification['sandbox']['status']}`"
+                ),
             ]
         )
     output_md.write_text("\n".join(lines) + "\n", encoding="utf-8")

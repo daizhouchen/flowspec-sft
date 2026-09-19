@@ -20,7 +20,7 @@ Agent 把自然语言直接变成工具调用时，常见失败并非语言不�
 - 格式错误允许确定性修复；语义错误最多反馈模型一次，失败后转人工确认。
 - 2,200 条合成样本：1,600 train / 250 dev / 250 test / 100 challenge；按模板族切分以避免改写泄漏。
 - FastAPI 提供 `/api/compile`、`/api/validate`、`/api/simulate`、`/api/tools`。
-- Qwen3-0.6B / 1.7B QLoRA 训练、推理与评测脚本已经就绪。
+- 已完成 Qwen3-1.7B 4-bit QLoRA、四组基线、GGUF Q4_K_M 导出及模型后端联调。
 
 ## 系统架构
 
@@ -39,16 +39,18 @@ flowchart LR
     I --> J[逐节点轨迹与失败原因]
 ```
 
-## 当前基线
+## 实验结果
 
-下表是无需 GPU 的启发式编译器结果，**测试集仍待作者逐条人工复核，状态为 provisional**。
+Qwen3-1.7B 在 1,600 条训练样本上完成 4-bit QLoRA；标准测试集 250 条，未见工具组合挑战集 100 条。测试集与挑战集仍待作者逐条人工复核，因此数字为 **provisional**，不可视为线上业务效果。
 
-| 数据集 | Schema 合法率 | DAG 合法率 | 沙箱通过率 | 工具 F1 | 参数槽位 F1 | 依赖边 F1 |
-|---|---:|---:|---:|---:|---:|---:|
-| 标准测试集（250） | 1.000 | 1.000 | 1.000 | 0.873 | 0.866 | 0.775 |
-| 未见组合挑战集（100） | 1.000 | 1.000 | 1.000 | 0.407 | 0.433 | 0.000 |
+| 方案 | Schema | DAG | 沙箱 | 工具 F1 | 参数 F1 | 依赖边 F1 | 语义结构 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| zero-shot | 0.668 | 0.668 | 0.500 | 0.251 | 0.002 | 0.000 | 0.084 |
+| few-shot + 校验器 | 0.852 | 0.852 | 0.852 | 0.706 | 0.719 | 0.595 | 0.674 |
+| QLoRA + 校验器 | **1.000** | **1.000** | **1.000** | **0.856** | **0.844** | **0.680** | **0.793** |
+| QLoRA 挑战集 | **1.000** | **1.000** | **1.000** | **0.818** | **0.801** | 0.376 | **0.665** |
 
-挑战集上的明显下降被保留为真实错误分析入口。zero-shot、few-shot、基础模型 + 校验器、QLoRA + 校验器四组模型实验需在共享 GPU 资源门禁通过后运行，仓库不会预填结果。完整基线见 [`reports/heuristic-baseline.json`](reports/heuristic-baseline.json)。
+QLoRA 相对 few-shot 的语义结构得分提高 **11.95 个百分点**，沙箱通过率提高 **14.8 个百分点**；四项预设验收门槛全部达到。训练损失 0.0221，验证损失 0.1914，峰值分配显存 4.276 GiB。完整配置、延迟、资源峰值和错误分析见 [`reports/experiment-summary.md`](reports/experiment-summary.md)、[模型卡](MODEL_CARD.md)与[错误分析](docs/error-analysis.md)。
 
 ## 一条命令启动
 
@@ -121,7 +123,7 @@ Transformers + LoRA Adapter：
 ```bash
 FLOWSPEC_COMPILER=transformers \
 FLOWSPEC_MODEL=Qwen/Qwen3-1.7B \
-FLOWSPEC_ADAPTER=artifacts/qwen3-1.7b-qlora-compact \
+FLOWSPEC_ADAPTER=artifacts/qwen3-1.7b-qlora-diverse \
 uv run uvicorn flowspec.api:app --port 8010
 ```
 
@@ -135,6 +137,13 @@ FLOWSPEC_COMPILER=llama_cpp docker compose --profile model up --build
 
 模型输出先经过确定性格式修复；若仍有语义校验错误，模型最多接收一次错误反馈。
 再次失败时 API 返回 `validation_failed`，不会进入沙箱执行。
+
+最终 Q4_K_M 文件为 1,107,408,736 bytes，SHA-256 为
+`cb9ce8cde4b3f733b2c97fa43966517914a841e08a8eaffee303af74962ce0a3`。
+远程 CPU 冒烟以 2 线程在 6.37 秒内完成模型加载与单轮回复；随后通过
+`llama-server → FastAPI → /api/compile → /api/simulate` 验证，生成的 5 节点工作流
+通过 Schema、DAG 与沙箱执行。该端到端样例耗时 70.75 秒，适合作为零成本验证路径，
+不代表并发服务性能。验证记录见 [`reports/e2e-verification.json`](reports/e2e-verification.json)。
 
 ## 测试与人工复核
 

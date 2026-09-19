@@ -112,9 +112,16 @@ def main() -> None:
                     "latency_ms": per_item_latency,
                 }
                 handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    adapter_display = None
+    if args.adapter:
+        resolved_adapter = args.adapter.resolve()
+        try:
+            adapter_display = str(resolved_adapter.relative_to(Path.cwd().resolve()))
+        except ValueError:
+            adapter_display = str(resolved_adapter)
     metadata = {
         "base_model": args.model,
-        "adapter": str(args.adapter.resolve()) if args.adapter else None,
+        "adapter": adapter_display,
         "mode": args.mode,
         "count": len(rows),
         "batch_size": args.batch_size,

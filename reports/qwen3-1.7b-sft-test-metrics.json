@@ -1,0 +1,14 @@
+{
+  "count": 250,
+  "parse_failure_rate": 0.044,
+  "schema_valid_rate": 0.956,
+  "dag_valid_rate": 0.956,
+  "sandbox_pass_rate": 0.908,
+  "tool_f1": 0.639,
+  "argument_slot_f1": 0.459,
+  "dependency_edge_f1": 0.2483,
+  "semantic_structure_score": 0.4488,
+  "exact_structure_rate": 0.0,
+  "repair_rate": 0.828,
+  "mean_latency_ms": 3922.98
+}

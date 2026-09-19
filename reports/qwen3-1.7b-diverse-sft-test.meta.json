@@ -1,0 +1,12 @@
+{
+  "base_model": "Qwen/Qwen3-1.7B",
+  "adapter": "artifacts/qwen3-1.7b-qlora-diverse",
+  "mode": "sft",
+  "count": 250,
+  "batch_size": 16,
+  "max_new_tokens": 1200,
+  "mean_latency_ms": 1825.97,
+  "wall_time_seconds": 456.92,
+  "peak_allocated_gib": 5.003,
+  "peak_reserved_gib": 5.596
+}

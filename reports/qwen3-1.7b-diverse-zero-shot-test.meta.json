@@ -1,0 +1,12 @@
+{
+  "base_model": "Qwen/Qwen3-1.7B",
+  "adapter": null,
+  "mode": "zero-shot",
+  "count": 250,
+  "batch_size": 16,
+  "max_new_tokens": 1200,
+  "mean_latency_ms": 201.88,
+  "wall_time_seconds": 50.81,
+  "peak_allocated_gib": 4.455,
+  "peak_reserved_gib": 4.615
+}

@@ -7,7 +7,7 @@ PROJECT="$ROOT/flowspec-sft"
 PYTHON="${FLOWSPEC_PYTHON:-$ROOT/envs/flowspec-py310/bin/python}"
 CONVERT_DEPS="${FLOWSPEC_CONVERT_DEPS:-$ROOT/tools/llama-convert-deps}"
 MODEL="${FLOWSPEC_MODEL:-Qwen/Qwen3-1.7B}"
-ADAPTER="${FLOWSPEC_ADAPTER:-$PROJECT/artifacts/qwen3-1.7b-qlora-compact}"
+ADAPTER="${FLOWSPEC_ADAPTER:-$PROJECT/artifacts/qwen3-1.7b-qlora-diverse}"
 MERGED="${FLOWSPEC_MERGED:-$PROJECT/artifacts/qwen3-1.7b-flowspec-merged}"
 GGUF_DIR="${FLOWSPEC_GGUF_DIR:-$PROJECT/artifacts/gguf}"
 LLAMA_CPP="${FLOWSPEC_LLAMA_CPP:-$ROOT/tools/llama.cpp}"
@@ -52,7 +52,8 @@ PYTHONPATH="$CONVERT_DEPS${PYTHONPATH:+:$PYTHONPATH}" \
 
 sha256sum "$Q4" > "$Q4.sha256"
 timeout 180 "$LLAMA_CPP/build/bin/llama-cli" \
-  -m "$Q4" -p '只输出一个空 JSON 对象。' -n 8 -t 2 --temp 0 \
+  -m "$Q4" -p 'Reply with exactly OK.' -n 16 -t 2 --temp 0 \
+  --reasoning off --single-turn --simple-io --no-display-prompt --log-disable < /dev/null \
   > "$GGUF_DIR/cpu-smoke.txt" 2>&1
 ls -lh "$F16" "$Q4" "$Q4.sha256"
 

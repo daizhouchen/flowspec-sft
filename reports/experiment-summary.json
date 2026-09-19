@@ -1,0 +1,247 @@
+{
+  "base_model": "Qwen/Qwen3-1.7B",
+  "run_prefix": "qwen3-1.7b-diverse",
+  "artifact": "artifacts/qwen3-1.7b-qlora-diverse",
+  "train": {
+    "base_model": "Qwen/Qwen3-1.7B",
+    "dev_examples": 250,
+    "epoch": 2.0,
+    "max_length": 2048,
+    "peak_allocated_gib": 4.276,
+    "peak_reserved_gib": 6.119,
+    "total_flos": 2.087560364628787e+16,
+    "train_examples": 1600,
+    "train_loss": 0.02209317027547513,
+    "train_runtime": 1505.2144,
+    "train_samples_per_second": 2.126,
+    "train_steps_per_second": 0.133
+  },
+  "eval": {
+    "epoch": 2.0,
+    "eval_loss": 0.19140739738941193,
+    "eval_runtime": 29.5552,
+    "eval_samples_per_second": 8.459,
+    "eval_steps_per_second": 8.459
+  },
+  "heuristic": {
+    "test": {
+      "count": 250,
+      "compiler": "heuristic-v1",
+      "schema_valid_rate": 1.0,
+      "dag_valid_rate": 1.0,
+      "sandbox_pass_rate": 1.0,
+      "tool_f1": 0.873,
+      "argument_slot_f1": 0.8661,
+      "dependency_edge_f1": 0.775,
+      "exact_structure_rate": 0.0,
+      "errors": {}
+    },
+    "challenge": {
+      "count": 100,
+      "compiler": "heuristic-v1",
+      "schema_valid_rate": 1.0,
+      "dag_valid_rate": 1.0,
+      "sandbox_pass_rate": 1.0,
+      "tool_f1": 0.4067,
+      "argument_slot_f1": 0.4331,
+      "dependency_edge_f1": 0.0,
+      "exact_structure_rate": 0.0,
+      "errors": {}
+    },
+    "leakage": {
+      "families": {
+        "train": [
+          "aggregate_chart_email",
+          "aggregate_report_export",
+          "approval_notify",
+          "collect_classify_report",
+          "failure_handling_search",
+          "feedback_risk_escalate",
+          "lookup_legal_notify",
+          "parallel_classify_translate",
+          "risk_approval_report",
+          "search_summarize_notify",
+          "sentiment_digest",
+          "translate_summary_email"
+        ],
+        "dev": [
+          "records_legal_export",
+          "translate_approval_email"
+        ],
+        "test": [
+          "search_risk_approval",
+          "sentiment_report_message"
+        ],
+        "challenge": [
+          "challenge_composition"
+        ]
+      },
+      "overlaps": {
+        "train:dev": [],
+        "train:test": [],
+        "train:challenge": [],
+        "dev:test": [],
+        "dev:challenge": [],
+        "test:challenge": []
+      },
+      "passed": true
+    },
+    "review_status": "pending_user_review",
+    "model_baselines": "completed_qwen3_1_7b_qlora"
+  },
+  "metrics": {
+    "zero_shot_test": {
+      "count": 250,
+      "parse_failure_rate": 0.0,
+      "schema_valid_rate": 0.668,
+      "dag_valid_rate": 0.668,
+      "sandbox_pass_rate": 0.5,
+      "tool_f1": 0.2513,
+      "argument_slot_f1": 0.0015,
+      "dependency_edge_f1": 0.0,
+      "semantic_structure_score": 0.0843,
+      "exact_structure_rate": 0.0,
+      "repair_rate": 1.0,
+      "mean_latency_ms": 201.88
+    },
+    "few_shot_test": {
+      "count": 250,
+      "parse_failure_rate": 0.148,
+      "schema_valid_rate": 0.852,
+      "dag_valid_rate": 0.852,
+      "sandbox_pass_rate": 0.852,
+      "tool_f1": 0.7061,
+      "argument_slot_f1": 0.7192,
+      "dependency_edge_f1": 0.5952,
+      "semantic_structure_score": 0.6735,
+      "exact_structure_rate": 0.076,
+      "repair_rate": 0.516,
+      "mean_latency_ms": 2614.3
+    },
+    "sft_test": {
+      "count": 250,
+      "parse_failure_rate": 0.0,
+      "schema_valid_rate": 1.0,
+      "dag_valid_rate": 1.0,
+      "sandbox_pass_rate": 1.0,
+      "tool_f1": 0.8558,
+      "argument_slot_f1": 0.8438,
+      "dependency_edge_f1": 0.6795,
+      "semantic_structure_score": 0.793,
+      "exact_structure_rate": 0.34,
+      "repair_rate": 0.0,
+      "mean_latency_ms": 1825.97
+    },
+    "sft_challenge": {
+      "count": 100,
+      "parse_failure_rate": 0.0,
+      "schema_valid_rate": 1.0,
+      "dag_valid_rate": 1.0,
+      "sandbox_pass_rate": 1.0,
+      "tool_f1": 0.8183,
+      "argument_slot_f1": 0.8008,
+      "dependency_edge_f1": 0.3759,
+      "semantic_structure_score": 0.665,
+      "exact_structure_rate": 0.0,
+      "repair_rate": 0.0,
+      "mean_latency_ms": 2224.0
+    }
+  },
+  "inference": {
+    "zero_shot": {
+      "base_model": "Qwen/Qwen3-1.7B",
+      "adapter": null,
+      "mode": "zero-shot",
+      "count": 250,
+      "batch_size": 16,
+      "max_new_tokens": 1200,
+      "mean_latency_ms": 201.88,
+      "wall_time_seconds": 50.81,
+      "peak_allocated_gib": 4.455,
+      "peak_reserved_gib": 4.615
+    },
+    "few_shot": {
+      "base_model": "Qwen/Qwen3-1.7B",
+      "adapter": null,
+      "mode": "few-shot",
+      "count": 250,
+      "batch_size": 8,
+      "max_new_tokens": 1200,
+      "mean_latency_ms": 2614.3,
+      "wall_time_seconds": 654.65,
+      "peak_allocated_gib": 4.803,
+      "peak_reserved_gib": 5.281
+    },
+    "sft": {
+      "base_model": "Qwen/Qwen3-1.7B",
+      "adapter": "artifacts/qwen3-1.7b-qlora-diverse",
+      "mode": "sft",
+      "count": 250,
+      "batch_size": 16,
+      "max_new_tokens": 1200,
+      "mean_latency_ms": 1825.97,
+      "wall_time_seconds": 456.92,
+      "peak_allocated_gib": 5.003,
+      "peak_reserved_gib": 5.596
+    },
+    "sft_challenge": {
+      "base_model": "Qwen/Qwen3-1.7B",
+      "adapter": "artifacts/qwen3-1.7b-qlora-diverse",
+      "mode": "sft",
+      "count": 100,
+      "batch_size": 16,
+      "max_new_tokens": 1200,
+      "mean_latency_ms": 2224.0,
+      "wall_time_seconds": 222.58,
+      "peak_allocated_gib": 5.014,
+      "peak_reserved_gib": 5.842
+    }
+  },
+  "quantized_model": {
+    "path": "artifacts/gguf/flowspec-qwen3-1.7b-q4_k_m.gguf",
+    "bytes": 1107408736,
+    "sha256": "cb9ce8cde4b3f733b2c97fa43966517914a841e08a8eaffee303af74962ce0a3"
+  },
+  "deployment_verification": {
+    "verified_at": "2026-09-19",
+    "environment": "shared remote server, CPU inference, 2 threads",
+    "quantized_model": {
+      "format": "GGUF Q4_K_M",
+      "bytes": 1107408736,
+      "sha256": "cb9ce8cde4b3f733b2c97fa43966517914a841e08a8eaffee303af74962ce0a3"
+    },
+    "cpu_smoke": {
+      "wall_ms": 6373,
+      "prompt": "Reply with exactly OK.",
+      "output": "OK."
+    },
+    "api_compile": {
+      "backend": "qwen3-gguf-llama-cpp",
+      "elapsed_ms": 70745.19,
+      "nodes": 5,
+      "tools": [
+        "knowledge.search",
+        "risk.classify",
+        "human.approval",
+        "report.generate",
+        "message.send"
+      ],
+      "validation": "schema_valid_and_dag_valid",
+      "repair_count": 0
+    },
+    "sandbox": {
+      "status": "completed",
+      "trace_steps": 5,
+      "succeeded_steps": 5
+    }
+  },
+  "sandbox_gain_vs_few_shot": 0.148,
+  "semantic_gain_vs_few_shot": 0.1195,
+  "target_checks": {
+    "schema_at_least_0_95": true,
+    "dag_at_least_0_90": true,
+    "sandbox_at_least_0_80": true,
+    "semantic_gain_vs_few_shot_at_least_0_08": true
+  },
+  "all_targets_met": true
+}

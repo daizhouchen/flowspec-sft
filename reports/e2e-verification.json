@@ -1,0 +1,33 @@
+{
+  "verified_at": "2026-09-19",
+  "environment": "shared remote server, CPU inference, 2 threads",
+  "quantized_model": {
+    "format": "GGUF Q4_K_M",
+    "bytes": 1107408736,
+    "sha256": "cb9ce8cde4b3f733b2c97fa43966517914a841e08a8eaffee303af74962ce0a3"
+  },
+  "cpu_smoke": {
+    "wall_ms": 6373,
+    "prompt": "Reply with exactly OK.",
+    "output": "OK."
+  },
+  "api_compile": {
+    "backend": "qwen3-gguf-llama-cpp",
+    "elapsed_ms": 70745.19,
+    "nodes": 5,
+    "tools": [
+      "knowledge.search",
+      "risk.classify",
+      "human.approval",
+      "report.generate",
+      "message.send"
+    ],
+    "validation": "schema_valid_and_dag_valid",
+    "repair_count": 0
+  },
+  "sandbox": {
+    "status": "completed",
+    "trace_steps": 5,
+    "succeeded_steps": 5
+  }
+}

@@ -103,7 +103,7 @@ def main() -> None:
         "challenge": evaluate_rows(load_jsonl(args.data / "challenge.jsonl")),
         "leakage": leakage_check(args.data),
         "review_status": "pending_user_review",
-        "model_baselines": "pending_gpu_run",
+        "model_baselines": "completed_qwen3_1_7b_qlora",
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
