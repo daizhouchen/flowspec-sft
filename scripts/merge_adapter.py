@@ -19,13 +19,18 @@ def main() -> None:
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     args.output.mkdir(parents=True, exist_ok=True)
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model,
+        trust_remote_code=True,
+        local_files_only=True,
+    )
     base = AutoModelForCausalLM.from_pretrained(
         args.model,
         torch_dtype=torch.bfloat16,
         device_map="cpu",
         low_cpu_mem_usage=True,
         trust_remote_code=True,
+        local_files_only=True,
     )
     merged = PeftModel.from_pretrained(base, args.adapter).merge_and_unload()
     merged.save_pretrained(

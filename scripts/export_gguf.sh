@@ -18,6 +18,7 @@ export MKL_NUM_THREADS="${MKL_NUM_THREADS:-2}"
 export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-2}"
 export NUMEXPR_NUM_THREADS="${NUMEXPR_NUM_THREADS:-2}"
 export HF_HOME="${HF_HOME:-$ROOT/cache/huggingface}"
+export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 export PIP_CACHE_DIR="${PIP_CACHE_DIR:-$ROOT/cache/pip}"
 
 mkdir -p "$GGUF_DIR" "$ROOT/tools"
