@@ -31,8 +31,11 @@ if [[ ! -d "$LLAMA_CPP/.git" ]]; then
 fi
 
 mkdir -p "$CONVERT_DEPS"
-"$PYTHON" -m pip install --disable-pip-version-check --target "$CONVERT_DEPS" \
-  'sentencepiece>=0.1.98,<0.3.0' 'protobuf>=4.21.0,<5.0.0'
+if ! PYTHONPATH="$CONVERT_DEPS${PYTHONPATH:+:$PYTHONPATH}" \
+  "$PYTHON" -c 'import sentencepiece; import google.protobuf'; then
+  "$PYTHON" -m pip install --disable-pip-version-check --target "$CONVERT_DEPS" \
+    'sentencepiece>=0.1.98,<0.3.0' 'protobuf>=4.21.0,<5.0.0'
+fi
 cmake -S "$LLAMA_CPP" -B "$LLAMA_CPP/build" \
   -DGGML_CUDA=OFF -DLLAMA_CURL=OFF -DLLAMA_USE_PREBUILT_UI=OFF \
   -DCMAKE_BUILD_TYPE=Release
