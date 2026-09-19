@@ -34,7 +34,8 @@ mkdir -p "$CONVERT_DEPS"
 "$PYTHON" -m pip install --disable-pip-version-check --target "$CONVERT_DEPS" \
   'sentencepiece>=0.1.98,<0.3.0' 'protobuf>=4.21.0,<5.0.0'
 cmake -S "$LLAMA_CPP" -B "$LLAMA_CPP/build" \
-  -DGGML_CUDA=OFF -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release
+  -DGGML_CUDA=OFF -DLLAMA_CURL=OFF -DLLAMA_USE_PREBUILT_UI=OFF \
+  -DCMAKE_BUILD_TYPE=Release
 cmake --build "$LLAMA_CPP/build" \
   --target llama-quantize llama-cli llama-server -j2
 
