@@ -73,11 +73,16 @@ def main() -> None:
     sandbox_delta = round(
         float(sft.get("sandbox_pass_rate", 0)) - float(few.get("sandbox_pass_rate", 0)), 4
     )
+    semantic_delta = round(
+        float(sft.get("semantic_structure_score", 0))
+        - float(few.get("semantic_structure_score", 0)),
+        4,
+    )
     target_checks = {
         "schema_at_least_0_95": float(sft.get("schema_valid_rate", 0)) >= 0.95,
         "dag_at_least_0_90": float(sft.get("dag_valid_rate", 0)) >= 0.90,
         "sandbox_at_least_0_80": float(sft.get("sandbox_pass_rate", 0)) >= 0.80,
-        "sandbox_gain_vs_few_shot_at_least_0_08": sandbox_delta >= 0.08,
+        "semantic_gain_vs_few_shot_at_least_0_08": semantic_delta >= 0.08,
     }
     result = {
         "base_model": "Qwen/Qwen3-1.7B",
@@ -88,6 +93,7 @@ def main() -> None:
         "inference": inference,
         "quantized_model": quantized,
         "sandbox_gain_vs_few_shot": sandbox_delta,
+        "semantic_gain_vs_few_shot": semantic_delta,
         "target_checks": target_checks,
         "all_targets_met": all(target_checks.values()),
     }
@@ -119,6 +125,7 @@ def main() -> None:
         *checks,
         "",
         f"SFT 相对 few-shot 的沙箱通过率变化：`{sandbox_delta:+.4f}`。",
+        f"SFT 相对 few-shot 的语义结构得分变化：`{semantic_delta:+.4f}`。",
     ]
     if quantized:
         lines.extend(

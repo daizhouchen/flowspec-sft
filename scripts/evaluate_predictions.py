@@ -53,15 +53,19 @@ def main() -> None:
         ):
             scores[name].append(f1(predicted_set, gold_set))
     count = len(gold)
+    tool_f1 = sum(scores["tool"]) / count
+    slot_f1 = sum(scores["slot"]) / count
+    edge_f1 = sum(scores["edge"]) / count
     result = {
         "count": count,
         "parse_failure_rate": round(parse_failures / count, 4),
         "schema_valid_rate": round(scores["schema"] / count, 4),
         "dag_valid_rate": round(scores["dag"] / count, 4),
         "sandbox_pass_rate": round(scores["sandbox"] / count, 4),
-        "tool_f1": round(sum(scores["tool"]) / count, 4),
-        "argument_slot_f1": round(sum(scores["slot"]) / count, 4),
-        "dependency_edge_f1": round(sum(scores["edge"]) / count, 4),
+        "tool_f1": round(tool_f1, 4),
+        "argument_slot_f1": round(slot_f1, 4),
+        "dependency_edge_f1": round(edge_f1, 4),
+        "semantic_structure_score": round((tool_f1 + slot_f1 + edge_f1) / 3, 4),
         "exact_structure_rate": round(exact_structures / count, 4),
         "repair_rate": round(repairs / count, 4),
         "mean_latency_ms": round(sum(latencies) / count, 2),
