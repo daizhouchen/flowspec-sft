@@ -13,3 +13,14 @@ def test_extract_json_repairs_mismatched_node_closer():
     result = extract_json(malformed)
     assert result is not None
     assert result["nodes"][0]["when"] == "ready"
+
+
+def test_extract_json_moves_failure_handler_inside_previous_node():
+    malformed = (
+        '{"schema_version":"1.0","nodes":['
+        '{"id":"risk","retry":{"max_attempts":0}},'
+        '"on_failure":{"tool":"admin.notify","arguments":{"message":"failed"}}]}'
+    )
+    result = extract_json(malformed)
+    assert result is not None
+    assert result["nodes"][0]["on_failure"]["tool"] == "admin.notify"

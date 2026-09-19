@@ -65,5 +65,10 @@ def extract_json(text: str) -> dict[str, Any] | None:
         r'}, "\1":',
         cleaned,
     )
+    cleaned = re.sub(
+        r'\}\}\s*,\s*"(when|on_failure)"\s*:',
+        r'}, "\1":',
+        cleaned,
+    )
     cleaned = re.sub(r'("(?:[^"\\]|\\.)*")\)\s*,', r"\1,", cleaned)
     return _raw_decode_object(_balance_delimiters(cleaned))
