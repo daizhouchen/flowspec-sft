@@ -91,6 +91,9 @@ def main() -> None:
                     **inputs,
                     max_new_tokens=args.max_new_tokens,
                     do_sample=False,
+                    temperature=None,
+                    top_p=None,
+                    top_k=None,
                     pad_token_id=tokenizer.eos_token_id,
                 )
             batch_latency_ms = (time.perf_counter() - started) * 1000
