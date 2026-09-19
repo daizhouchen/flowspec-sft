@@ -4,7 +4,6 @@ from pathlib import Path
 
 from flowspec.tools import TOOL_MAP
 
-
 DATA = Path(__file__).parents[1] / "data" / "generated"
 
 
