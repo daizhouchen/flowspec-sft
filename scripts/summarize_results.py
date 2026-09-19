@@ -35,7 +35,19 @@ def metric_row(label: str, metrics: dict[str, Any] | None) -> list[str]:
         "semantic_structure_score",
         "mean_latency_ms",
     ]
-    return [label] + [str(metrics.get(key, "—")) for key in keys]
+    values = []
+    for key in keys:
+        value = metrics.get(key)
+        if key == "semantic_structure_score" and value is None:
+            parts = [
+                metrics.get("tool_f1"),
+                metrics.get("argument_slot_f1"),
+                metrics.get("dependency_edge_f1"),
+            ]
+            if all(part is not None for part in parts):
+                value = round(sum(float(part) for part in parts) / 3, 4)
+        values.append(str(value) if value is not None else "—")
+    return [label] + values
 
 
 def main() -> None:
@@ -134,6 +146,7 @@ def main() -> None:
         metric_row("Qwen3-1.7B zero-shot", metrics["zero_shot_test"]),
         metric_row("Qwen3-1.7B few-shot", metrics["few_shot_test"]),
         metric_row("Qwen3-1.7B QLoRA", metrics["sft_test"]),
+        metric_row("Qwen3-1.7B QLoRA（挑战集）", metrics["sft_challenge"]),
     ]
     table = [
         "| 方案 | Schema | DAG | 沙箱 | 工具 F1 | 参数 F1 | 依赖边 F1 | 语义结构 | 平均延迟 ms |",
@@ -143,6 +156,8 @@ def main() -> None:
     checks = [f"- {'通过' if passed else '未通过'}：`{name}`" for name, passed in target_checks.items()]
     lines = [
         "# FlowSpec 实验汇总",
+        "",
+        f"实验前缀：`{prefix}`；Adapter：`{artifact.relative_to(root)}`。",
         "",
         *table,
         "",
