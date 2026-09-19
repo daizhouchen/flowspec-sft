@@ -38,7 +38,8 @@ fi
   -r "$LLAMA_CPP/requirements.txt"
 cmake -S "$LLAMA_CPP" -B "$LLAMA_CPP/build" \
   -DGGML_CUDA=OFF -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release
-cmake --build "$LLAMA_CPP/build" --target llama-quantize -j2
+cmake --build "$LLAMA_CPP/build" \
+  --target llama-quantize llama-cli llama-server -j2
 
 F16="$GGUF_DIR/flowspec-qwen3-1.7b-f16.gguf"
 Q4="$GGUF_DIR/flowspec-qwen3-1.7b-q4_k_m.gguf"
@@ -47,6 +48,9 @@ Q4="$GGUF_DIR/flowspec-qwen3-1.7b-q4_k_m.gguf"
 "$LLAMA_CPP/build/bin/llama-quantize" "$F16" "$Q4" Q4_K_M 2
 
 sha256sum "$Q4" > "$Q4.sha256"
+timeout 180 "$LLAMA_CPP/build/bin/llama-cli" \
+  -m "$Q4" -p '只输出一个空 JSON 对象。' -n 8 -t 2 --temp 0 \
+  > "$GGUF_DIR/cpu-smoke.txt" 2>&1
 ls -lh "$F16" "$Q4" "$Q4.sha256"
 
 if [[ "${FLOWSPEC_CLEAN_INTERMEDIATE:-0}" == "1" ]]; then
