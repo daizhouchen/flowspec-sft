@@ -27,9 +27,17 @@
     "families": {
       "train": [
         "aggregate_chart_email",
+        "aggregate_report_export",
+        "approval_notify",
         "collect_classify_report",
+        "failure_handling_search",
+        "feedback_risk_escalate",
+        "lookup_legal_notify",
+        "parallel_classify_translate",
         "risk_approval_report",
-        "search_summarize_notify"
+        "search_summarize_notify",
+        "sentiment_digest",
+        "translate_summary_email"
       ],
       "dev": [
         "records_legal_export",
