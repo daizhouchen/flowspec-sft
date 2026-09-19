@@ -126,7 +126,7 @@ uv run uvicorn flowspec.api:app --port 8010
 ```
 
 远程服务器上的 CPU 导出命令会合并 Adapter、转换为 GGUF Q4_K_M，并生成
-SHA-256 校验文件；llama.cpp 的依赖使用独立虚拟环境，不会修改训练环境：
+SHA-256 校验文件；额外转换依赖安装在独立目录中，不会修改训练环境：
 
 ```bash
 FLOWSPEC_CLEAN_INTERMEDIATE=1 bash scripts/export_gguf.sh

@@ -5,8 +5,7 @@ set -euo pipefail
 ROOT="${FLOWSPEC_ROOT:-/home/jiangjiaqi/zcdai}"
 PROJECT="$ROOT/flowspec-sft"
 PYTHON="${FLOWSPEC_PYTHON:-$ROOT/envs/flowspec-py310/bin/python}"
-EXPORT_ENV="${FLOWSPEC_EXPORT_ENV:-$ROOT/envs/llama-cpp-export}"
-EXPORT_PYTHON="$EXPORT_ENV/bin/python"
+CONVERT_DEPS="${FLOWSPEC_CONVERT_DEPS:-$ROOT/tools/llama-convert-deps}"
 MODEL="${FLOWSPEC_MODEL:-Qwen/Qwen3-1.7B}"
 ADAPTER="${FLOWSPEC_ADAPTER:-$PROJECT/artifacts/qwen3-1.7b-qlora-compact}"
 MERGED="${FLOWSPEC_MERGED:-$PROJECT/artifacts/qwen3-1.7b-flowspec-merged}"
@@ -31,11 +30,9 @@ if [[ ! -d "$LLAMA_CPP/.git" ]]; then
   git clone --depth 1 https://github.com/ggml-org/llama.cpp.git "$LLAMA_CPP"
 fi
 
-if [[ ! -x "$EXPORT_PYTHON" ]]; then
-  "$PYTHON" -m venv "$EXPORT_ENV"
-fi
-"$EXPORT_PYTHON" -m pip install --disable-pip-version-check \
-  -r "$LLAMA_CPP/requirements.txt"
+mkdir -p "$CONVERT_DEPS"
+"$PYTHON" -m pip install --disable-pip-version-check --target "$CONVERT_DEPS" \
+  'sentencepiece>=0.1.98,<0.3.0' 'protobuf>=4.21.0,<5.0.0'
 cmake -S "$LLAMA_CPP" -B "$LLAMA_CPP/build" \
   -DGGML_CUDA=OFF -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release
 cmake --build "$LLAMA_CPP/build" \
@@ -43,7 +40,8 @@ cmake --build "$LLAMA_CPP/build" \
 
 F16="$GGUF_DIR/flowspec-qwen3-1.7b-f16.gguf"
 Q4="$GGUF_DIR/flowspec-qwen3-1.7b-q4_k_m.gguf"
-"$EXPORT_PYTHON" "$LLAMA_CPP/convert_hf_to_gguf.py" \
+PYTHONPATH="$CONVERT_DEPS${PYTHONPATH:+:$PYTHONPATH}" \
+  "$PYTHON" "$LLAMA_CPP/convert_hf_to_gguf.py" \
   "$MERGED" --outfile "$F16" --outtype f16
 "$LLAMA_CPP/build/bin/llama-quantize" "$F16" "$Q4" Q4_K_M 2
 
