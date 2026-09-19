@@ -20,3 +20,22 @@ jobs:
         with: { node-version: 22, cache: npm, cache-dependency-path: web/package-lock.json }
       - run: npm ci
       - run: npm run build
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose config
+      - run: docker build -t flowspec-ci .
+      - run: docker run -d --name flowspec-ci -p 8010:8010 flowspec-ci
+      - name: Smoke test container
+        run: |
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8010/api/health; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs flowspec-ci
+          exit 1
+      - if: always()
+        run: docker logs flowspec-ci
