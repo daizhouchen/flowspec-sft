@@ -9,6 +9,33 @@ from .schema import ValidationIssue, ValidationResult, WorkflowSpec
 from .tools import TOOL_MAP
 
 
+def _safe_node_id(value: Any, fallback: str, used: set[str]) -> str:
+    candidate = "".join(
+        char if (char.isascii() and char.isalnum()) or char == "_" else "_"
+        for char in str(value).lower()
+    )
+    candidate = candidate.strip("_")
+    if not candidate or not candidate[0].isalpha():
+        candidate = fallback
+    candidate = candidate[:32]
+    base = candidate
+    suffix = 2
+    while candidate in used:
+        tail = f"_{suffix}"
+        candidate = f"{base[: 32 - len(tail)]}{tail}"
+        suffix += 1
+    used.add(candidate)
+    return candidate
+
+
+def _normalize_failure_handler(value: Any) -> dict[str, Any] | None:
+    if isinstance(value, dict) and value.get("tool"):
+        return value
+    if isinstance(value, str) and value in TOOL_MAP:
+        return {"tool": value, "arguments": {}}
+    return None
+
+
 def validate_workflow(payload: dict[str, Any] | WorkflowSpec) -> tuple[WorkflowSpec | None, ValidationResult]:
     issues: list[ValidationIssue] = []
     try:
@@ -79,16 +106,66 @@ def validate_workflow(payload: dict[str, Any] | WorkflowSpec) -> tuple[WorkflowS
 def repair_workflow(payload: dict[str, Any], issues: list[ValidationIssue]) -> tuple[dict[str, Any], list[str]]:
     repaired = dict(payload)
     logs: list[str] = []
+    if not isinstance(repaired.get("nodes"), list) and repaired.get("id") and repaired.get("tool"):
+        flat_node_keys = {
+            "id",
+            "tool",
+            "arguments",
+            "depends_on",
+            "when",
+            "requires_approval",
+            "retry",
+            "on_failure",
+        }
+        flat_node = {key: repaired.get(key) for key in flat_node_keys if key in repaired}
+        repaired = {
+            "schema_version": repaired.get("schema_version", "1.0"),
+            "name": repaired.get("name") or repaired.get("id") or "generated_workflow",
+            "description": repaired.get("description") or "模型生成的工作流",
+            "trigger": repaired.get("trigger") if isinstance(repaired.get("trigger"), dict) else {"type": "manual"},
+            "nodes": [flat_node],
+        }
+        logs.append("将扁平节点包装为 WorkflowSpec")
     if "schema_version" not in repaired:
         repaired["schema_version"] = "1.0"
         logs.append("补充 schema_version=1.0")
     nodes = [dict(node) for node in repaired.get("nodes", []) if isinstance(node, dict)]
-    valid_ids = {node.get("id") for node in nodes}
+    used_ids: set[str] = set()
+    id_map: dict[Any, str] = {}
+    for index, node in enumerate(nodes, start=1):
+        old_id = node.get("id")
+        new_id = _safe_node_id(old_id, f"step_{index}", used_ids)
+        id_map[old_id] = new_id
+        if old_id != new_id:
+            logs.append(f"规范化节点 ID：{old_id} → {new_id}")
+        node["id"] = new_id
+    valid_ids = set(id_map.values())
     for node in nodes:
+        arguments = node.get("arguments")
+        node["arguments"] = (
+            {key: value for key, value in arguments.items() if value is not None}
+            if isinstance(arguments, dict)
+            else {}
+        )
         raw_dependencies = node.get("depends_on")
         before = list(raw_dependencies) if isinstance(raw_dependencies, list) else []
-        node["depends_on"] = [dep for dep in before if dep in valid_ids and dep != node.get("id")]
+        mapped_dependencies = [id_map.get(dependency, dependency) for dependency in before]
+        node["depends_on"] = [
+            dependency
+            for dependency in mapped_dependencies
+            if dependency in valid_ids and dependency != node.get("id")
+        ]
         if before != node["depends_on"]:
             logs.append(f"移除 {node.get('id')} 的悬空或自引用依赖")
+        retry = node.get("retry")
+        if isinstance(retry, int):
+            node["retry"] = {"max_attempts": min(max(retry, 0), 3), "backoff_seconds": 0}
+            logs.append(f"规范化 {node.get('id')} 的重试策略")
+        elif not isinstance(retry, dict):
+            node["retry"] = {"max_attempts": 0, "backoff_seconds": 0}
+        failure_handler = _normalize_failure_handler(node.get("on_failure"))
+        if node.get("on_failure") != failure_handler:
+            logs.append(f"规范化 {node.get('id')} 的失败处理")
+        node["on_failure"] = failure_handler
     repaired["nodes"] = nodes
     return repaired, logs

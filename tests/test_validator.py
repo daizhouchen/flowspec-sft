@@ -50,3 +50,26 @@ def test_repair_treats_null_dependencies_as_empty_list():
     payload["nodes"][1]["depends_on"] = None
     repaired, _ = repair_workflow(payload, [])
     assert repaired["nodes"][1]["depends_on"] == []
+
+
+def test_repair_wraps_flat_node_and_normalizes_fields():
+    payload = {
+        "schema_version": "1.0",
+        "name": "flat_workflow",
+        "description": "模型输出了一个扁平节点",
+        "id": "This-ID-Is-Much-Too-Long-For-The-Schema-And-Needs-Truncation",
+        "tool": "knowledge.search",
+        "arguments": {"query": "测试", "top_k": None},
+        "depends_on": None,
+        "retry": 2,
+        "on_failure": "admin.notify",
+    }
+    repaired, logs = repair_workflow(payload, [])
+    workflow, result = validate_workflow(repaired)
+    assert result.schema_valid
+    assert workflow is not None
+    assert len(workflow.nodes[0].id) <= 32
+    assert workflow.nodes[0].arguments == {"query": "测试"}
+    assert workflow.nodes[0].retry.max_attempts == 2
+    assert workflow.nodes[0].on_failure.tool == "admin.notify"
+    assert "将扁平节点包装为 WorkflowSpec" in logs
