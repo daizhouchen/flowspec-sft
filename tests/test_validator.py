@@ -73,3 +73,53 @@ def test_repair_wraps_flat_node_and_normalizes_fields():
     assert workflow.nodes[0].retry.max_attempts == 2
     assert workflow.nodes[0].on_failure.tool == "admin.notify"
     assert "将扁平节点包装为 WorkflowSpec" in logs
+
+
+def test_repair_normalizes_model_argument_aliases_and_trigger_node():
+    payload = {
+        "schema_version": "1.0",
+        "name": "model_output",
+        "description": "模型参数使用了常见别名",
+        "trigger": {"type": "manual"},
+        "nodes": [
+            {
+                "id": "collect",
+                "tool": "feedback.search",
+                "arguments": {"query": "客户反馈"},
+                "depends_on": [],
+            },
+            {
+                "id": "analyze",
+                "tool": "text.analyze",
+                "arguments": {"input": "collect"},
+                "depends_on": ["collect"],
+            },
+            {
+                "id": "send",
+                "tool": "message.send",
+                "arguments": {"input": "analyze", "recipient": "产品群"},
+                "depends_on": ["analyze"],
+                "requires_approval": True,
+            },
+            {
+                "id": "trigger",
+                "tool": "manual",
+                "arguments": {},
+                "depends_on": ["send"],
+            },
+        ],
+    }
+    repaired, logs = repair_workflow(payload, [])
+    workflow, result = validate_workflow(repaired)
+    assert result.valid
+    assert workflow is not None
+    assert [node.tool for node in workflow.nodes] == [
+        "feedback.search",
+        "sentiment.analyze",
+        "message.send",
+    ]
+    assert workflow.nodes[0].arguments["date_range"] == "latest"
+    assert workflow.nodes[1].arguments["input_from"] == "collect"
+    assert workflow.nodes[2].arguments["channel"] == "产品群"
+    assert any("规范化工具名称" in item for item in logs)
+    assert any("移除误作为节点输出的触发器" in item for item in logs)

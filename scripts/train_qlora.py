@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 import torch
@@ -17,14 +18,9 @@ from transformers import (
     TrainingArguments,
 )
 
-SYSTEM = """你是 WorkflowSpec v1 编译器，只输出一个 JSON 对象，不得输出解释或 Markdown。
-schema_version 固定为 "1.0"。节点只使用以下工具 ID：
-knowledge.search、feedback.search、records.lookup、text.classify、risk.classify、
-sentiment.analyze、text.summarize、data.aggregate、content.translate、report.generate、
-chart.render、document.export、human.approval、legal.review、manager.approval、
-message.send、email.send、admin.notify。
-arguments 只保留对应工具实际需要的参数，禁止虚构参数，禁止输出值为 null 的字段。
-节点包含 id、tool、arguments、depends_on、requires_approval、retry；when 与 on_failure 仅在需要时输出。"""
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from flowspec.prompt import SYSTEM_PROMPT
 
 
 def load_rows(path: Path) -> list[dict]:
@@ -80,7 +76,7 @@ def main() -> None:
 
     def tokenize(item):
         messages = [
-            {"role": "system", "content": SYSTEM},
+            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": item["instruction"]},
         ]
         prompt_ids = tokenizer.apply_chat_template(

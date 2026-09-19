@@ -8,6 +8,25 @@ from pydantic import ValidationError
 from .schema import ValidationIssue, ValidationResult, WorkflowSpec
 from .tools import TOOL_MAP
 
+TOOL_ALIASES = {
+    "text.analyze": "sentiment.analyze",
+    "sentiment.classify": "sentiment.analyze",
+    "notification.send": "message.send",
+}
+
+ARGUMENT_ALIASES = {
+    "input_from": ["input", "source", "source_node", "from"],
+    "channel": ["recipient", "target", "group"],
+    "recipient": ["email", "target", "channel"],
+    "message": ["content", "reason", "input"],
+    "date_range": ["period", "range", "time_range"],
+    "query": ["keyword", "topic"],
+    "record_type": ["type", "entity"],
+    "target_language": ["language", "target_lang"],
+    "chart_type": ["type", "format"],
+    "format": ["output_format", "file_type"],
+}
+
 
 def _safe_node_id(value: Any, fallback: str, used: set[str]) -> str:
     candidate = "".join(
@@ -34,6 +53,35 @@ def _normalize_failure_handler(value: Any) -> dict[str, Any] | None:
     if isinstance(value, str) and value in TOOL_MAP:
         return {"tool": value, "arguments": {}}
     return None
+
+
+def _normalize_arguments(node: dict[str, Any], logs: list[str]) -> None:
+    tool = TOOL_MAP.get(node.get("tool"))
+    if not tool:
+        return
+    arguments = node["arguments"]
+    for name, parameter in tool.parameters.items():
+        if name in arguments or not parameter.required:
+            continue
+        for alias in ARGUMENT_ALIASES.get(name, []):
+            if alias in arguments:
+                arguments[name] = arguments.pop(alias)
+                logs.append(f"规范化 {node.get('id')} 的参数：{alias} → {name}")
+                break
+        if name in arguments:
+            continue
+        if name == "input_from" and node.get("depends_on"):
+            arguments[name] = node["depends_on"][-1]
+            logs.append(f"根据依赖补充 {node.get('id')} 的 input_from")
+        elif name == "date_range":
+            arguments[name] = "latest"
+            logs.append(f"补充 {node.get('id')} 的默认 date_range")
+        elif name == "message" and node.get("tool") == "admin.notify":
+            arguments[name] = "workflow failed"
+            logs.append(f"补充 {node.get('id')} 的失败通知内容")
+        elif name == "chart_type":
+            arguments[name] = "bar"
+            logs.append(f"补充 {node.get('id')} 的默认 chart_type")
 
 
 def validate_workflow(payload: dict[str, Any] | WorkflowSpec) -> tuple[WorkflowSpec | None, ValidationResult]:
@@ -130,6 +178,24 @@ def repair_workflow(payload: dict[str, Any], issues: list[ValidationIssue]) -> t
         repaired["schema_version"] = "1.0"
         logs.append("补充 schema_version=1.0")
     nodes = [dict(node) for node in repaired.get("nodes", []) if isinstance(node, dict)]
+    referenced = {
+        dependency
+        for node in nodes
+        for dependency in (
+            node.get("depends_on", []) if isinstance(node.get("depends_on"), list) else []
+        )
+    }
+    filtered_nodes = []
+    for node in nodes:
+        if node.get("tool") == "manual" and node.get("id") not in referenced:
+            logs.append(f"移除误作为节点输出的触发器：{node.get('id')}")
+            continue
+        tool = TOOL_ALIASES.get(node.get("tool"), node.get("tool"))
+        if tool != node.get("tool"):
+            logs.append(f"规范化工具名称：{node.get('tool')} → {tool}")
+            node["tool"] = tool
+        filtered_nodes.append(node)
+    nodes = filtered_nodes
     used_ids: set[str] = set()
     id_map: dict[Any, str] = {}
     for index, node in enumerate(nodes, start=1):
@@ -167,5 +233,6 @@ def repair_workflow(payload: dict[str, Any], issues: list[ValidationIssue]) -> t
         if node.get("on_failure") != failure_handler:
             logs.append(f"规范化 {node.get('id')} 的失败处理")
         node["on_failure"] = failure_handler
+        _normalize_arguments(node, logs)
     repaired["nodes"] = nodes
     return repaired, logs
