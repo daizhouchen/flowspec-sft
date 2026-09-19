@@ -24,7 +24,7 @@ def sha256(path: Path) -> str:
 
 def metric_row(label: str, metrics: dict[str, Any] | None) -> list[str]:
     if not metrics:
-        return [label] + ["—"] * 7
+        return [label] + ["—"] * 8
     keys = [
         "schema_valid_rate",
         "dag_valid_rate",
@@ -32,6 +32,7 @@ def metric_row(label: str, metrics: dict[str, Any] | None) -> list[str]:
         "tool_f1",
         "argument_slot_f1",
         "dependency_edge_f1",
+        "semantic_structure_score",
         "mean_latency_ms",
     ]
     return [label] + [str(metrics.get(key, "—")) for key in keys]
@@ -40,19 +41,42 @@ def metric_row(label: str, metrics: dict[str, Any] | None) -> list[str]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--project", type=Path, default=Path("."))
+    parser.add_argument(
+        "--run-prefix",
+        help="Report filename prefix, for example qwen3-1.7b-schema.",
+    )
+    parser.add_argument(
+        "--artifact",
+        type=Path,
+        help="Adapter artifact directory relative to the project root.",
+    )
     parser.add_argument("--output-json", type=Path, default=Path("reports/experiment-summary.json"))
     parser.add_argument("--output-md", type=Path, default=Path("reports/experiment-summary.md"))
     args = parser.parse_args()
 
     root = args.project.resolve()
     reports = root / "reports"
-    artifact = root / "artifacts" / "qwen3-1.7b-qlora-compact"
+    schema_prefix = "qwen3-1.7b-schema"
+    legacy_prefix = "qwen3-1.7b"
+    prefix = args.run_prefix or (
+        schema_prefix
+        if (reports / f"{schema_prefix}-sft-test-metrics.json").exists()
+        else legacy_prefix
+    )
+    artifact = root / (
+        args.artifact
+        or Path(
+            "artifacts/qwen3-1.7b-qlora-schema"
+            if prefix == schema_prefix
+            else "artifacts/qwen3-1.7b-qlora-compact"
+        )
+    )
     heuristic = read_json(reports / "heuristic-baseline.json") or {}
     named_paths = {
-        "zero_shot_test": reports / "qwen3-1.7b-zero-shot-test-metrics.json",
-        "few_shot_test": reports / "qwen3-1.7b-few-shot-test-metrics.json",
-        "sft_test": reports / "qwen3-1.7b-sft-test-metrics.json",
-        "sft_challenge": reports / "qwen3-1.7b-sft-challenge-metrics.json",
+        "zero_shot_test": reports / f"{prefix}-zero-shot-test-metrics.json",
+        "few_shot_test": reports / f"{prefix}-few-shot-test-metrics.json",
+        "sft_test": reports / f"{prefix}-sft-test-metrics.json",
+        "sft_challenge": reports / f"{prefix}-sft-challenge-metrics.json",
     }
     metrics = {name: read_json(path) for name, path in named_paths.items()}
     train = read_json(artifact / "train_results.json")
@@ -86,6 +110,8 @@ def main() -> None:
     }
     result = {
         "base_model": "Qwen/Qwen3-1.7B",
+        "run_prefix": prefix,
+        "artifact": str(artifact.relative_to(root)),
         "train": train,
         "eval": evaluation,
         "heuristic": heuristic,
@@ -110,8 +136,8 @@ def main() -> None:
         metric_row("Qwen3-1.7B QLoRA", metrics["sft_test"]),
     ]
     table = [
-        "| 方案 | Schema | DAG | 沙箱 | 工具 F1 | 参数 F1 | 依赖边 F1 | 平均延迟 ms |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        "| 方案 | Schema | DAG | 沙箱 | 工具 F1 | 参数 F1 | 依赖边 F1 | 语义结构 | 平均延迟 ms |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
         *("| " + " | ".join(row) + " |" for row in rows),
     ]
     checks = [f"- {'通过' if passed else '未通过'}：`{name}`" for name, passed in target_checks.items()]
