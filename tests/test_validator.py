@@ -69,6 +69,16 @@ def test_dangling_input_is_rejected():
     assert any(issue.code == "dangling_input" for issue in result.issues)
 
 
+def test_failure_handler_arguments_are_validated():
+    payload = valid_workflow()
+    payload["nodes"][0]["on_failure"] = {
+        "tool": "admin.notify",
+        "arguments": {},
+    }
+    _, result = validate_workflow(payload)
+    assert any(issue.code == "missing_failure_argument" for issue in result.issues)
+
+
 def test_dangling_and_self_dependency_are_rejected():
     payload = valid_workflow()
     payload["nodes"][1]["depends_on"] = ["missing", "report"]
@@ -164,3 +174,11 @@ def test_repair_removes_unknown_tool_arguments():
     repaired, logs = repair_workflow(payload, [])
     assert repaired["nodes"][0]["arguments"] == {"query": "反馈"}
     assert any("未知参数" in item for item in logs)
+
+
+def test_repair_adds_failure_notification_message():
+    payload = valid_workflow()
+    payload["nodes"][0]["on_failure"] = "admin.notify"
+    repaired, logs = repair_workflow(payload, [])
+    assert repaired["nodes"][0]["on_failure"]["arguments"]["message"]
+    assert any("失败通知内容" in item for item in logs)

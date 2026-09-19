@@ -177,6 +177,37 @@ def validate_workflow(
                     node_id=node.id,
                 )
             )
+        if node.on_failure:
+            failure_tool = TOOL_MAP.get(node.on_failure.tool)
+            if not failure_tool:
+                issues.append(
+                    ValidationIssue(
+                        code="unknown_failure_tool",
+                        level="error",
+                        message=f"未知失败处理工具：{node.on_failure.tool}",
+                        node_id=node.id,
+                    )
+                )
+            else:
+                for name, parameter in failure_tool.parameters.items():
+                    if parameter.required and name not in node.on_failure.arguments:
+                        issues.append(
+                            ValidationIssue(
+                                code="missing_failure_argument",
+                                level="error",
+                                message=f"失败处理缺少必填参数：{name}",
+                                node_id=node.id,
+                            )
+                        )
+                for name in sorted(set(node.on_failure.arguments) - set(failure_tool.parameters)):
+                    issues.append(
+                        ValidationIssue(
+                            code="unknown_failure_argument",
+                            level="error",
+                            message=f"失败处理工具不接受参数：{name}",
+                            node_id=node.id,
+                        )
+                    )
 
     queue = deque(sorted(node_id for node_id, degree in indegree.items() if degree == 0))
     order: list[str] = []
@@ -339,6 +370,13 @@ def repair_workflow(
         failure_handler = _normalize_failure_handler(node.get("on_failure"))
         if node.get("on_failure") != failure_handler:
             logs.append(f"规范化 {node.get('id')} 的失败处理")
+        if (
+            failure_handler
+            and failure_handler.get("tool") == "admin.notify"
+            and not failure_handler.get("arguments", {}).get("message")
+        ):
+            failure_handler.setdefault("arguments", {})["message"] = "workflow failed"
+            logs.append(f"补充 {node.get('id')} 的失败通知内容")
         node["on_failure"] = failure_handler
         _normalize_arguments(node, logs)
     repaired["nodes"] = nodes
