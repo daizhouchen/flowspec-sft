@@ -10,7 +10,9 @@ from .validator import validate_workflow
 
 
 def load_jsonl(path: Path) -> list[dict]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+    ]
 
 
 def f1(predicted: set, expected: set) -> float:
@@ -23,9 +25,15 @@ def f1(predicted: set, expected: set) -> float:
 
 
 def features(workflow: dict) -> tuple[set, set, set]:
-    tools = {node["tool"] for node in workflow.get("nodes", [])}
-    slots = {(node["tool"], key) for node in workflow.get("nodes", []) for key in node.get("arguments", {})}
-    edges = {(dep, node["id"]) for node in workflow.get("nodes", []) for dep in node.get("depends_on", [])}
+    nodes = workflow.get("nodes", [])
+    tools = {node["tool"] for node in nodes}
+    slots = {(node["tool"], key) for node in nodes for key in node.get("arguments", {})}
+    id_to_tool = {node.get("id"): node.get("tool") for node in nodes}
+    edges = {
+        (id_to_tool.get(dependency, dependency), node["tool"])
+        for node in nodes
+        for dependency in node.get("depends_on", [])
+    }
     return tools, slots, edges
 
 
@@ -70,13 +78,19 @@ def evaluate_rows(rows: list[dict]) -> dict:
 def leakage_check(data_dir: Path) -> dict:
     families = {}
     for split in ["train", "dev", "test", "challenge"]:
-        families[split] = {row["template_family"] for row in load_jsonl(data_dir / f"{split}.jsonl")}
+        families[split] = {
+            row["template_family"] for row in load_jsonl(data_dir / f"{split}.jsonl")
+        }
     overlaps = {}
     keys = list(families)
     for i, left in enumerate(keys):
         for right in keys[i + 1 :]:
             overlaps[f"{left}:{right}"] = sorted(families[left] & families[right])
-    return {"families": {key: sorted(value) for key, value in families.items()}, "overlaps": overlaps, "passed": not any(overlaps.values())}
+    return {
+        "families": {key: sorted(value) for key, value in families.items()},
+        "overlaps": overlaps,
+        "passed": not any(overlaps.values()),
+    }
 
 
 def main() -> None:
@@ -98,4 +112,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
