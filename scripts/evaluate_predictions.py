@@ -22,6 +22,7 @@ def main() -> None:
     scores = {"schema": 0, "dag": 0, "sandbox": 0, "tool": [], "slot": [], "edge": []}
     parse_failures = 0
     repairs = 0
+    exact_structures = 0
     latencies = []
     for item_id, row in gold.items():
         record = predictions.get(item_id, {})
@@ -43,6 +44,7 @@ def main() -> None:
         )
         predicted_features = features(prediction)
         gold_features = features(row["output"])
+        exact_structures += int(predicted_features == gold_features)
         for name, predicted_set, gold_set in zip(
             ["tool", "slot", "edge"], predicted_features, gold_features, strict=True
         ):
@@ -57,6 +59,7 @@ def main() -> None:
         "tool_f1": round(sum(scores["tool"]) / count, 4),
         "argument_slot_f1": round(sum(scores["slot"]) / count, 4),
         "dependency_edge_f1": round(sum(scores["edge"]) / count, 4),
+        "exact_structure_rate": round(exact_structures / count, 4),
         "repair_rate": round(repairs / count, 4),
         "mean_latency_ms": round(sum(latencies) / count, 2),
     }
