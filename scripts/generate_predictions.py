@@ -46,6 +46,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--max-new-tokens", type=int, default=1200)
+    parser.add_argument("--metadata-output", type=Path)
     args = parser.parse_args()
 
     import torch
@@ -65,6 +66,8 @@ def main() -> None:
     if args.adapter:
         model = PeftModel.from_pretrained(model, args.adapter)
     model.eval()
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
 
     demonstrations = load_jsonl(args.few_shot_source)[:2] if args.mode == "few-shot" else []
     rows = load_jsonl(args.input)
@@ -72,6 +75,8 @@ def main() -> None:
         rows = rows[: args.limit]
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
+    observed_latencies: list[float] = []
+    started_all = time.perf_counter()
     with args.output.open("w", encoding="utf-8") as handle:
         for start in range(0, len(rows), args.batch_size):
             batch = rows[start : start + args.batch_size]
@@ -112,14 +117,38 @@ def main() -> None:
                 skip_special_tokens=True,
             )
             for row, text in zip(batch, generated_texts, strict=True):
+                per_item_latency = round(batch_latency_ms / len(batch), 2)
+                observed_latencies.append(per_item_latency)
                 record = {
                     "id": row["id"],
                     "mode": args.mode,
                     "prediction": extract_json(text),
                     "raw_text": text,
-                    "latency_ms": round(batch_latency_ms / len(batch), 2),
+                    "latency_ms": per_item_latency,
                 }
                 handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    metadata = {
+        "base_model": args.model,
+        "adapter": str(args.adapter.resolve()) if args.adapter else None,
+        "mode": args.mode,
+        "count": len(rows),
+        "batch_size": args.batch_size,
+        "max_new_tokens": args.max_new_tokens,
+        "mean_latency_ms": round(sum(observed_latencies) / max(1, len(rows)), 2),
+        "wall_time_seconds": round(time.perf_counter() - started_all, 2),
+    }
+    if torch.cuda.is_available():
+        metadata["peak_allocated_gib"] = round(
+            torch.cuda.max_memory_allocated() / (1024**3), 3
+        )
+        metadata["peak_reserved_gib"] = round(
+            torch.cuda.max_memory_reserved() / (1024**3), 3
+        )
+    metadata_output = args.metadata_output or args.output.with_suffix(".meta.json")
+    metadata_output.write_text(
+        json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
 
 if __name__ == "__main__":
