@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .compiler import compile_request
+from .model_compiler import configured_compiler_name, get_compiler
 from .schema import (
     CompileRequest,
     CompileResponse,
@@ -33,7 +34,11 @@ app.add_middleware(
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "mode": os.getenv("FLOWSPEC_MODE", "demo"), "compiler": "heuristic-v1"}
+    return {
+        "status": "ok",
+        "mode": os.getenv("FLOWSPEC_MODE", "demo"),
+        "compiler": configured_compiler_name(),
+    }
 
 
 @app.get("/api/tools", response_model=list[ToolDefinition])
@@ -43,7 +48,7 @@ def tools() -> list[ToolDefinition]:
 
 @app.post("/api/compile", response_model=CompileResponse)
 def compile_endpoint(request: CompileRequest) -> CompileResponse:
-    return compile_request(request)
+    return compile_request(request, get_compiler())
 
 
 @app.post("/api/validate", response_model=ValidationResult)

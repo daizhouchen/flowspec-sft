@@ -67,6 +67,15 @@ def compile_request(request: CompileRequest, compiler=None) -> CompileResponse:
         repaired, repair_log = repair_workflow(raw, validation.issues)
         workflow, validation = validate_workflow(repaired)
         raw = repaired
+        model_repair = getattr(compiler, "repair", None)
+        if not validation.valid and callable(model_repair):
+            raw = model_repair(request.instruction, raw, validation.issues)
+            repair_log.append("模型根据校验错误完成一次语义修复")
+            workflow, validation = validate_workflow(raw)
+            if not validation.valid:
+                raw, deterministic_log = repair_workflow(raw, validation.issues)
+                repair_log.extend(deterministic_log)
+                workflow, validation = validate_workflow(raw)
     return CompileResponse(
         request_id=str(uuid.uuid4()),
         elapsed_ms=round((time.perf_counter() - started) * 1000, 2),
@@ -77,4 +86,3 @@ def compile_request(request: CompileRequest, compiler=None) -> CompileResponse:
         compiler=compiler.name,
         error_type=None if validation.valid else "validation_failed",
     )
-

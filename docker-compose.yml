@@ -2,7 +2,10 @@ services:
   app:
     build: .
     ports: ["8010:8010"]
-    environment: { FLOWSPEC_MODE: local }
+    environment:
+      FLOWSPEC_MODE: local
+      FLOWSPEC_COMPILER: ${FLOWSPEC_COMPILER:-heuristic}
+      FLOWSPEC_LLAMA_URL: ${FLOWSPEC_LLAMA_URL:-http://llama-server:8080}
   web:
     image: node:22-alpine
     working_dir: /app
@@ -10,3 +13,20 @@ services:
     volumes: ["./web:/app"]
     ports: ["5174:5174"]
     depends_on: [app]
+
+  llama-server:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    profiles: ["model"]
+    command:
+      - -m
+      - /models/flowspec-qwen3-1.7b-q4_k_m.gguf
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - -c
+      - "2048"
+      - -t
+      - "2"
+    volumes:
+      - ./artifacts/gguf:/models:ro

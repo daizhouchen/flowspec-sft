@@ -113,6 +113,29 @@ uv run python scripts/evaluate_predictions.py \
   --output reports/sft-metrics.json
 ```
 
+## 模型推理服务与 CPU 量化
+
+FastAPI 默认使用零依赖启发式编译器，便于直接运行。完成训练后可切换到
+Transformers + LoRA Adapter：
+
+```bash
+FLOWSPEC_COMPILER=transformers \
+FLOWSPEC_MODEL=Qwen/Qwen3-1.7B \
+FLOWSPEC_ADAPTER=artifacts/qwen3-1.7b-qlora-compact \
+uv run uvicorn flowspec.api:app --port 8010
+```
+
+远程服务器上的 CPU 导出命令会合并 Adapter、转换为 GGUF Q4_K_M，并生成
+SHA-256 校验文件；llama.cpp 的依赖使用独立虚拟环境，不会修改训练环境：
+
+```bash
+FLOWSPEC_CLEAN_INTERMEDIATE=1 bash scripts/export_gguf.sh
+FLOWSPEC_COMPILER=llama_cpp docker compose --profile model up --build
+```
+
+模型输出先经过确定性格式修复；若仍有语义校验错误，模型最多接收一次错误反馈。
+再次失败时 API 返回 `validation_failed`，不会进入沙箱执行。
+
 ## 测试与人工复核
 
 ```bash
