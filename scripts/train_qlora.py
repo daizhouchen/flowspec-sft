@@ -154,7 +154,31 @@ def main() -> None:
         processing_class=tokenizer,
         data_collator=collator,
     )
-    trainer.train()
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats()
+    train_result = trainer.train()
+    train_metrics = dict(train_result.metrics)
+    if torch.cuda.is_available():
+        train_metrics["peak_allocated_gib"] = round(
+            torch.cuda.max_memory_allocated() / (1024**3), 3
+        )
+        train_metrics["peak_reserved_gib"] = round(
+            torch.cuda.max_memory_reserved() / (1024**3), 3
+        )
+    train_metrics.update(
+        {
+            "base_model": args.model,
+            "train_examples": len(train),
+            "dev_examples": len(dev),
+            "max_length": args.max_length,
+        }
+    )
+    trainer.log_metrics("train", train_metrics)
+    trainer.save_metrics("train", train_metrics)
+    eval_metrics = trainer.evaluate()
+    trainer.log_metrics("eval", eval_metrics)
+    trainer.save_metrics("eval", eval_metrics)
+    trainer.save_state()
     trainer.save_model()
     tokenizer.save_pretrained(args.output)
 
