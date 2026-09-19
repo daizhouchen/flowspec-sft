@@ -82,16 +82,26 @@ def _normalize_arguments(node: dict[str, Any], logs: list[str]) -> None:
         elif name == "chart_type":
             arguments[name] = "bar"
             logs.append(f"补充 {node.get('id')} 的默认 chart_type")
+    unknown = sorted(set(arguments) - set(tool.parameters))
+    for name in unknown:
+        arguments.pop(name)
+        logs.append(f"移除 {node.get('id')} 的未知参数：{name}")
 
 
-def validate_workflow(payload: dict[str, Any] | WorkflowSpec) -> tuple[WorkflowSpec | None, ValidationResult]:
+def validate_workflow(
+    payload: dict[str, Any] | WorkflowSpec,
+) -> tuple[WorkflowSpec | None, ValidationResult]:
     issues: list[ValidationIssue] = []
     try:
-        workflow = payload if isinstance(payload, WorkflowSpec) else WorkflowSpec.model_validate(payload)
+        workflow = (
+            payload if isinstance(payload, WorkflowSpec) else WorkflowSpec.model_validate(payload)
+        )
     except ValidationError as error:
         for item in error.errors():
             issues.append(ValidationIssue(code="schema_error", level="error", message=item["msg"]))
-        return None, ValidationResult(valid=False, schema_valid=False, dag_valid=False, issues=issues)
+        return None, ValidationResult(
+            valid=False, schema_valid=False, dag_valid=False, issues=issues
+        )
 
     ids = {node.id for node in workflow.nodes}
     adjacency: dict[str, list[str]] = defaultdict(list)
@@ -99,23 +109,74 @@ def validate_workflow(payload: dict[str, Any] | WorkflowSpec) -> tuple[WorkflowS
     for node in workflow.nodes:
         tool = TOOL_MAP.get(node.tool)
         if not tool:
-            issues.append(ValidationIssue(code="unknown_tool", level="error", message=f"未知工具：{node.tool}", node_id=node.id))
+            issues.append(
+                ValidationIssue(
+                    code="unknown_tool",
+                    level="error",
+                    message=f"未知工具：{node.tool}",
+                    node_id=node.id,
+                )
+            )
         else:
             for name, parameter in tool.parameters.items():
                 if parameter.required and name not in node.arguments:
-                    issues.append(ValidationIssue(code="missing_argument", level="error", message=f"缺少必填参数：{name}", node_id=node.id))
+                    issues.append(
+                        ValidationIssue(
+                            code="missing_argument",
+                            level="error",
+                            message=f"缺少必填参数：{name}",
+                            node_id=node.id,
+                        )
+                    )
+            for name in sorted(set(node.arguments) - set(tool.parameters)):
+                issues.append(
+                    ValidationIssue(
+                        code="unknown_argument",
+                        level="error",
+                        message=f"工具不接受参数：{name}",
+                        node_id=node.id,
+                    )
+                )
             if tool.risk == "notify" and not node.requires_approval:
-                issues.append(ValidationIssue(code="approval_recommended", level="warning", message="通知类操作建议显式确认", node_id=node.id))
+                issues.append(
+                    ValidationIssue(
+                        code="approval_recommended",
+                        level="warning",
+                        message="通知类操作建议显式确认",
+                        node_id=node.id,
+                    )
+                )
         for dependency in node.depends_on:
             if dependency not in ids:
-                issues.append(ValidationIssue(code="dangling_dependency", level="error", message=f"依赖节点不存在：{dependency}", node_id=node.id))
+                issues.append(
+                    ValidationIssue(
+                        code="dangling_dependency",
+                        level="error",
+                        message=f"依赖节点不存在：{dependency}",
+                        node_id=node.id,
+                    )
+                )
                 continue
             adjacency[dependency].append(node.id)
             indegree[node.id] += 1
         if node.id in node.depends_on:
-            issues.append(ValidationIssue(code="self_dependency", level="error", message="节点不能依赖自身", node_id=node.id))
+            issues.append(
+                ValidationIssue(
+                    code="self_dependency",
+                    level="error",
+                    message="节点不能依赖自身",
+                    node_id=node.id,
+                )
+            )
         if node.when and not node.depends_on:
-            issues.append(ValidationIssue(code="condition_without_source", level="error", message="条件节点必须依赖上游节点", node_id=node.id))
+            issues.append(
+                ValidationIssue(
+                    code="condition_without_source",
+                    level="error",
+                    message="条件节点必须依赖上游节点",
+                    node_id=node.id,
+                )
+            )
 
     queue = deque(sorted(node_id for node_id, degree in indegree.items() if degree == 0))
     order: list[str] = []
@@ -130,6 +191,41 @@ def validate_workflow(payload: dict[str, Any] | WorkflowSpec) -> tuple[WorkflowS
     if not dag_valid:
         issues.append(ValidationIssue(code="cycle", level="error", message="工作流存在循环依赖"))
 
+    if dag_valid:
+        descendants: dict[str, set[str]] = {}
+        for source in ids:
+            seen: set[str] = set()
+            pending_descendants = list(adjacency[source])
+            while pending_descendants:
+                current = pending_descendants.pop()
+                if current in seen:
+                    continue
+                seen.add(current)
+                pending_descendants.extend(adjacency[current])
+            descendants[source] = seen
+        for node in workflow.nodes:
+            input_from = node.arguments.get("input_from")
+            if not isinstance(input_from, str):
+                continue
+            if input_from not in ids:
+                issues.append(
+                    ValidationIssue(
+                        code="dangling_input",
+                        level="error",
+                        message=f"输入节点不存在：{input_from}",
+                        node_id=node.id,
+                    )
+                )
+            elif node.id not in descendants[input_from]:
+                issues.append(
+                    ValidationIssue(
+                        code="non_upstream_input",
+                        level="error",
+                        message=f"输入节点不是当前节点的上游：{input_from}",
+                        node_id=node.id,
+                    )
+                )
+
     roots = [node.id for node in workflow.nodes if not node.depends_on]
     reachable = set(roots)
     pending = list(roots)
@@ -139,7 +235,14 @@ def validate_workflow(payload: dict[str, Any] | WorkflowSpec) -> tuple[WorkflowS
                 reachable.add(nxt)
                 pending.append(nxt)
     for node_id in ids - reachable:
-        issues.append(ValidationIssue(code="unreachable_node", level="error", message="节点不可从入口到达", node_id=node_id))
+        issues.append(
+            ValidationIssue(
+                code="unreachable_node",
+                level="error",
+                message="节点不可从入口到达",
+                node_id=node_id,
+            )
+        )
 
     has_error = any(issue.level == "error" for issue in issues)
     return workflow, ValidationResult(
@@ -151,7 +254,9 @@ def validate_workflow(payload: dict[str, Any] | WorkflowSpec) -> tuple[WorkflowS
     )
 
 
-def repair_workflow(payload: dict[str, Any], issues: list[ValidationIssue]) -> tuple[dict[str, Any], list[str]]:
+def repair_workflow(
+    payload: dict[str, Any], issues: list[ValidationIssue]
+) -> tuple[dict[str, Any], list[str]]:
     repaired = dict(payload)
     logs: list[str] = []
     if not isinstance(repaired.get("nodes"), list) and repaired.get("id") and repaired.get("tool"):
@@ -170,7 +275,9 @@ def repair_workflow(payload: dict[str, Any], issues: list[ValidationIssue]) -> t
             "schema_version": repaired.get("schema_version", "1.0"),
             "name": repaired.get("name") or repaired.get("id") or "generated_workflow",
             "description": repaired.get("description") or "模型生成的工作流",
-            "trigger": repaired.get("trigger") if isinstance(repaired.get("trigger"), dict) else {"type": "manual"},
+            "trigger": repaired.get("trigger")
+            if isinstance(repaired.get("trigger"), dict)
+            else {"type": "manual"},
             "nodes": [flat_node],
         }
         logs.append("将扁平节点包装为 WorkflowSpec")

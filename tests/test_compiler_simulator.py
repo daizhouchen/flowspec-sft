@@ -4,10 +4,17 @@ from flowspec.simulator import simulate
 
 
 def test_compile_business_instruction():
-    result = compile_request(CompileRequest(instruction="汇总上周客户反馈，分类并生成周报，确认后发到产品群。"))
+    result = compile_request(
+        CompileRequest(instruction="汇总上周客户反馈，分类并生成周报，确认后发到产品群。")
+    )
     assert result.validation.valid
     assert result.workflow is not None
-    assert {node.tool for node in result.workflow.nodes} >= {"feedback.search", "text.classify", "report.generate", "message.send"}
+    assert {node.tool for node in result.workflow.nodes} >= {
+        "feedback.search",
+        "text.classify",
+        "report.generate",
+        "message.send",
+    }
 
 
 def test_simulator_stops_for_approval():
@@ -44,10 +51,24 @@ def test_model_compiler_gets_only_one_semantic_repair():
 
         def repair(self, _instruction, payload, _issues):
             self.repair_calls += 1
-            payload["nodes"][0]["arguments"] = {
-                "input_from": "manual",
-                "channel": "product-team",
-            }
+            payload["nodes"] = [
+                {
+                    "id": "search",
+                    "tool": "knowledge.search",
+                    "arguments": {"query": "消息内容"},
+                    "depends_on": [],
+                },
+                {
+                    "id": "send",
+                    "tool": "message.send",
+                    "arguments": {
+                        "input_from": "search",
+                        "channel": "product-team",
+                    },
+                    "depends_on": ["search"],
+                    "requires_approval": True,
+                },
+            ]
             return payload
 
     compiler = RepairingCompiler()

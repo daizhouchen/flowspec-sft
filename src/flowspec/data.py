@@ -478,7 +478,7 @@ def build(family: str, index: int) -> tuple[str, WorkflowSpec]:
             node(
                 "send",
                 "message.send",
-                {"input_from": "export", "channel": channel},
+                {"input_from": "translate", "channel": channel},
                 ["approve"],
                 requires_approval=True,
             ),

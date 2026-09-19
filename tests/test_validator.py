@@ -3,11 +3,23 @@ from flowspec.validator import repair_workflow, validate_workflow
 
 def valid_workflow():
     return {
-        "schema_version": "1.0", "name": "weekly_report", "description": "生成周报",
+        "schema_version": "1.0",
+        "name": "weekly_report",
+        "description": "生成周报",
         "trigger": {"type": "manual"},
         "nodes": [
-            {"id": "search", "tool": "knowledge.search", "arguments": {"query": "反馈"}, "depends_on": []},
-            {"id": "report", "tool": "report.generate", "arguments": {"input_from": "search"}, "depends_on": ["search"]},
+            {
+                "id": "search",
+                "tool": "knowledge.search",
+                "arguments": {"query": "反馈"},
+                "depends_on": [],
+            },
+            {
+                "id": "report",
+                "tool": "report.generate",
+                "arguments": {"input_from": "search"},
+                "depends_on": ["search"],
+            },
         ],
     }
 
@@ -34,6 +46,27 @@ def test_unknown_tool_and_missing_argument_are_rejected():
     codes = {issue.code for issue in result.issues}
     assert "unknown_tool" in codes
     assert "missing_argument" in codes
+
+
+def test_non_upstream_input_is_rejected():
+    payload = valid_workflow()
+    payload["nodes"].append(
+        {
+            "id": "parallel",
+            "tool": "text.summarize",
+            "arguments": {"input_from": "report"},
+            "depends_on": ["search"],
+        }
+    )
+    _, result = validate_workflow(payload)
+    assert any(issue.code == "non_upstream_input" for issue in result.issues)
+
+
+def test_dangling_input_is_rejected():
+    payload = valid_workflow()
+    payload["nodes"][1]["arguments"]["input_from"] = "missing"
+    _, result = validate_workflow(payload)
+    assert any(issue.code == "dangling_input" for issue in result.issues)
 
 
 def test_dangling_and_self_dependency_are_rejected():
@@ -123,3 +156,11 @@ def test_repair_normalizes_model_argument_aliases_and_trigger_node():
     assert workflow.nodes[2].arguments["channel"] == "产品群"
     assert any("规范化工具名称" in item for item in logs)
     assert any("移除误作为节点输出的触发器" in item for item in logs)
+
+
+def test_repair_removes_unknown_tool_arguments():
+    payload = valid_workflow()
+    payload["nodes"][0]["arguments"]["recipient"] = "不属于检索工具"
+    repaired, logs = repair_workflow(payload, [])
+    assert repaired["nodes"][0]["arguments"] == {"query": "反馈"}
+    assert any("未知参数" in item for item in logs)
