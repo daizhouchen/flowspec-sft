@@ -3,27 +3,12 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import urllib.request
 from functools import lru_cache
 from typing import Any
 
+from .json_utils import extract_json
 from .prompt import SYSTEM_PROMPT
-
-
-def extract_json(text: str) -> dict[str, Any]:
-    cleaned = text.strip().removeprefix("```json").removesuffix("```").strip()
-    try:
-        value = json.loads(cleaned)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
-        if not match:
-            return {}
-        try:
-            value = json.loads(match.group())
-        except json.JSONDecodeError:
-            return {}
-    return value if isinstance(value, dict) else {}
 
 
 def repair_prompt(instruction: str, payload: dict[str, Any], issues: list[Any]) -> str:
@@ -81,7 +66,7 @@ class TransformersCompiler:
             generated[0, inputs.input_ids.shape[1] :],
             skip_special_tokens=True,
         )
-        return extract_json(text)
+        return extract_json(text) or {}
 
     def compile(self, instruction: str) -> dict[str, Any]:
         return self._generate(instruction)
@@ -119,7 +104,7 @@ class LlamaCppCompiler:
         )
         with urllib.request.urlopen(request, timeout=300) as response:
             result = json.load(response)
-        return extract_json(result["choices"][0]["message"]["content"])
+        return extract_json(result["choices"][0]["message"]["content"]) or {}
 
     def compile(self, instruction: str) -> dict[str, Any]:
         return self._generate(instruction)

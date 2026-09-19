@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from flowspec.eval import f1, features, load_jsonl
+from flowspec.json_utils import extract_json
 from flowspec.simulator import simulate
 from flowspec.validator import repair_workflow, validate_workflow
 
@@ -29,8 +30,10 @@ def main() -> None:
         prediction = record.get("prediction")
         latencies.append(float(record.get("latency_ms", 0)))
         if not isinstance(prediction, dict):
-            parse_failures += 1
-            prediction = {}
+            prediction = extract_json(str(record.get("raw_text", "")))
+            if not isinstance(prediction, dict):
+                parse_failures += 1
+                prediction = {}
         workflow, validation = validate_workflow(prediction)
         if not validation.valid and prediction:
             repaired, repair_log = repair_workflow(prediction, validation.issues)

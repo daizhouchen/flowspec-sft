@@ -3,32 +3,18 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
+from flowspec.json_utils import extract_json
 from flowspec.prompt import SYSTEM_PROMPT
 
 
 def load_jsonl(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
-
-
-def extract_json(text: str) -> dict | None:
-    text = text.strip().removeprefix("```json").removesuffix("```").strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", text, flags=re.DOTALL)
-        if not match:
-            return None
-        try:
-            return json.loads(match.group())
-        except json.JSONDecodeError:
-            return None
 
 
 def main() -> None:
