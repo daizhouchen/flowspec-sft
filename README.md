@@ -145,6 +145,19 @@ FLOWSPEC_COMPILER=llama_cpp docker compose --profile model up --build
 通过 Schema、DAG 与沙箱执行。该端到端样例耗时 70.75 秒，适合作为零成本验证路径，
 不代表并发服务性能。验证记录见 [`reports/e2e-verification.json`](reports/e2e-verification.json)。
 
+最终 Adapter、GGUF 和逐样本实验证据已发布至
+[`v1.0.0-models`](https://github.com/daizhouchen/flowspec-sft/releases/tag/v1.0.0-models)：
+
+```bash
+wget https://github.com/daizhouchen/flowspec-sft/releases/download/v1.0.0-models/flowspec-qwen3-1.7b-qlora-adapter.tar.gz
+wget https://github.com/daizhouchen/flowspec-sft/releases/download/v1.0.0-models/flowspec-qwen3-1.7b-q4_k_m.gguf
+wget https://github.com/daizhouchen/flowspec-sft/releases/download/v1.0.0-models/SHA256SUMS
+sha256sum -c SHA256SUMS
+```
+
+`flowspec-experiment-evidence.tar.gz` 另含 zero-shot、few-shot、两轮消融和最终
+QLoRA 的逐样本预测，以及精选训练、量化和端到端联调日志。
+
 ## 测试与人工复核
 
 ```bash

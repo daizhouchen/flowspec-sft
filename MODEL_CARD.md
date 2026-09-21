@@ -32,7 +32,9 @@ FlowSpec 使用 Qwen3-1.7B 将中文业务指令编译为 `WorkflowSpec v1` JSON
 - CPU 冒烟：2 线程，6.37 秒完成加载与单轮回复
 - 端到端：`llama-server` 与 FastAPI 联调通过；5 节点工作流完成生成、校验和沙箱执行
 
-仓库不直接提交 1.1 GB GGUF。`scripts/export_gguf.sh` 可从 Adapter 合并、量化并生成校验文件。
+仓库不直接提交 1.1 GB GGUF。最终 Adapter、GGUF、SHA-256 校验文件和逐样本实验证据可从
+[`v1.0.0-models`](https://github.com/daizhouchen/flowspec-sft/releases/tag/v1.0.0-models)
+下载；`scripts/export_gguf.sh` 也可从 Adapter 重新合并、量化并生成校验文件。
 
 ## 局限
 
