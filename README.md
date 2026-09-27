@@ -1,47 +1,61 @@
 # FlowSpec
 
-> 自然语言工作流编译、校验与小模型微调 · Natural language → validated workflow DAG
+> 工作流方案台：起草、检查、沙箱试跑与交接 · Draft, inspect, simulate and hand off workflow plans
 
-[在线沙箱 Demo](https://daizhouchen.github.io/flowspec-sft/) · [30 秒操作视频](docs/assets/demo.webm) · [数据卡](DATA_CARD.md) · [模型卡](MODEL_CARD.md) · [错误分析](docs/error-analysis.md)
+[打开工作台](https://daizhouchen.github.io/flowspec-sft/) · [使用说明](docs/product-workbench.md) · [工作台架构](docs/architecture-workbench.md) · [数据卡](DATA_CARD.md) · [模型卡](MODEL_CARD.md) · [错误分析](docs/error-analysis.md)
 
-![FlowSpec demo](docs/assets/demo.png)
+FlowSpec 帮助产品与开发者在接入真实系统前，把业务需求整理成可检查的工作流方案：修改步骤与参数、检查依赖和审批、用风险与故障场景试跑，再导出流程和交接记录。方案、试跑快照和等待确认的进度保存在当前浏览器，可下载完整备份并恢复为独立方案。
 
-FlowSpec 把中文业务描述转换成 `WorkflowSpec v1`，在运行前检查工具、参数、依赖、条件、人工确认、重试与失败路径。系统只在沙箱中模拟状态流转，不连接真实邮箱、企业微信、数据库写入或其他有副作用的系统。
+公开工作台使用浏览器中的有限规则起草和虚拟数据模拟，不调用语言模型、不发送消息、不连接业务数据库。自行运行时可选择本地配置的编译后端；后端生成的草案仍进入浏览器检查与模拟。原 Python 编译接口、Qwen3 训练和实验材料保留为独立研究路径。
 
 ## 为什么做这个项目
 
-Agent 把自然语言直接变成工具调用时，常见失败并非语言不流畅，而是结构不可执行：参数缺失、循环依赖、工具越权或通知前没有确认。FlowSpec 把生成任务改写成“编译问题”，让小模型负责结构生成，让确定性校验器负责执行门禁与有限修复。
+自动化需求落地前，需要说明数据从哪里来、步骤如何依赖、谁来确认、失败后如何处理。FlowSpec 让这些决定留在可编辑的方案中，并把规则检查、模拟结果和业务判断分开。研究部分继续探索小模型生成结构、确定性校验器检查与有限修复的编译流程。
 
 ## 当前能力
 
-- `WorkflowSpec v1` 支持串行、并行、条件分支、人工确认、重试和失败处理。
-- 18 个虚拟工具覆盖检索、分类、转换、报表、审批与通知六类能力。
-- 校验 JSON Schema、DAG、未知工具、必填参数、不可达节点和通知权限风险。
-- 格式错误允许确定性修复；语义错误最多反馈模型一次，失败后转人工确认。
-- 2,200 条合成样本：1,600 train / 250 dev / 250 test / 100 challenge；按模板族切分以避免改写泄漏。
-- FastAPI 提供 `/api/compile`、`/api/validate`、`/api/simulate`、`/api/tools`。
-- 已完成 Qwen3-1.7B 4-bit QLoRA、四组基线、GGUF Q4_K_M 导出及模型后端联调。
+- 三份模板、有限中文规则草案、手动搭建和 `WorkflowSpec v1` JSON 导入；规则识别、默认设置与未处理要求会分别展示。
+- 编辑真实依赖图和节点参数，定位结构、DAG、工具及输入来源问题。结构可读取的待修正方案也能保存，全部检查通过后才能试跑。
+- 18 个虚拟工具覆盖检索、分类、转换、报表、审批与通知；目录从 Python 注册表生成，保留参数类型、必填项和风险定义。
+- 浏览器模拟支持依赖分支、有限风险条件、逐节点审批、故障注入、重试和失败处理。通知和审批工具始终需要确认；确认后仍只产生模拟输出。
+- 修改需求或流程会增加方案版本并结束旧活动试跑；历史快照保留，重新试跑不会沿用旧审批。
+- IndexedDB 自动保存最多 30 份方案，每份保留最近 10 次试跑；可导出流程 JSON、完整备份或 Markdown 交接记录。没有云同步。
+
+研究资产包括 2,200 条合成样本（1,600 train / 250 dev / 250 test / 100 challenge，按模板族切分）、FastAPI 的 `/api/compile`、`/api/validate`、`/api/simulate`、`/api/tools`，以及已完成的 Qwen3-1.7B 4-bit QLoRA、四组基线、GGUF Q4_K_M 导出及模型后端联调。
+
+## Quick demo
+
+1. 打开工作台，选择「客户反馈周报」，在「编排流程」核对产品、负责人和通知目标。
+2. 在「检查与修正」查看问题；在「沙箱试跑」选择高风险，开始试跑，逐项确认风险审批与发送预览。
+3. 重新试跑低风险场景，观察风险审批被跳过，但周报发送仍需确认。再为检索步骤注入「持续失败」，观察重试耗尽、失败通知审批及下游阻断。
+4. 在「交付与记录」下载完整备份；从方案库「导入 / 恢复」恢复为独立方案，保留历史和等待确认的进度。
+
+检索结果、分类、报告和发送结果都是虚拟数据。规则检查通过不代表业务需求完整，`cron` / `event` 只保存触发声明，不创建调度任务或监听事件。具体条件语法、保存失败处理和导出区别见[使用说明](docs/product-workbench.md)。
+
+![FlowSpec 工作流方案台](docs/assets/demo.png)
 
 ## 系统架构
 
 ```mermaid
 flowchart LR
-    A[中文任务] --> B[规则基线 / Qwen3 编译器]
-    B --> C[WorkflowSpec v1 JSON]
-    C --> D[Schema 校验]
-    D --> E[DAG 与可达性校验]
-    E --> F[工具参数与权限校验]
-    F -->|格式错误| G[确定性修复]
-    F -->|语义错误| H[单次模型反馈]
-    G --> E
-    H --> E
-    F -->|通过| I[沙箱状态机]
-    I --> J[逐节点轨迹与失败原因]
+    A[模板 / 规则草案 / 手动编排 / 导入] --> B[方案与 WorkflowSpec]
+    K[可选本地编译后端] --> B
+    B --> C[浏览器结构与依赖 / 工具检查]
+    C -->|全部通过| D[场景 + 审批决定]
+    D --> E[浏览器模拟状态机]
+    E --> F[逐节点状态与轨迹]
+    B --> G[IndexedDB 本机方案库]
+    D --> G
+    G --> H[完整备份与恢复]
+    B --> I[流程 JSON / 交接记录]
+    F --> I
 ```
 
 ## 实验结果
 
 Qwen3-1.7B 在 1,600 条训练样本上完成 4-bit QLoRA；标准测试集 250 条，未见工具组合挑战集 100 条。测试集与挑战集仍待作者逐条人工复核，因此数字为 **provisional**，不可视为线上业务效果。
+
+以下数字来自原 Python 研究评测，保持原值。旧模拟器的沙箱通过率不能证明新版浏览器条件、逐节点审批、重试或失败处理的语义正确，也不是用户效率数据；新版行为由独立工作台测试覆盖。
 
 | 方案 | Schema | DAG | 沙箱 | 工具 F1 | 参数 F1 | 依赖边 F1 | 语义结构 |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -52,13 +66,25 @@ Qwen3-1.7B 在 1,600 条训练样本上完成 4-bit QLoRA；标准测试集 250 
 
 QLoRA 相对 few-shot 的语义结构得分提高 **11.95 个百分点**，沙箱通过率提高 **14.8 个百分点**；四项预设验收门槛全部达到。训练损失 0.0221，验证损失 0.1914，峰值分配显存 4.276 GiB。完整配置、延迟、资源峰值和错误分析见 [`reports/experiment-summary.md`](reports/experiment-summary.md)、[模型卡](MODEL_CARD.md)与[错误分析](docs/error-analysis.md)。
 
-## 一条命令启动
+## 本地启动
+
+只使用规则起草与浏览器模拟，不需要 Python 服务：
+
+```bash
+cd web
+npm ci
+npm run dev
+```
+
+打开 `http://localhost:5174`。方案存储按浏览器与站点来源隔离；本地页面和公开页面不会共享方案，请用完整备份转移。
+
+同时启动工作台与研究 API：
 
 ```bash
 docker compose up --build
 ```
 
-打开 `http://localhost:8010`。不使用 Docker 时：
+打开 `http://localhost:8010`。不使用 Docker 时，在仓库根目录启动 API，并保留上面的前端开发终端：
 
 ```bash
 uv sync --extra dev
@@ -66,13 +92,7 @@ uv run python -m flowspec.data --output data/generated
 uv run uvicorn flowspec.api:app --port 8010 --reload
 ```
 
-另一个终端：
-
-```bash
-cd web
-npm ci
-npm run dev
-```
+本地「从需求开始」可选择「本地配置的编译后端」。默认后端为启发式编译器；只有配置模型服务后才使用相应模型。前端开发服务将 `/api` 转发到本机 `8010` 端口。公开 Pages 构建隐藏这一入口。
 
 ## 训练与模型评测
 
@@ -160,6 +180,19 @@ QLoRA 的逐样本预测，以及精选训练、量化和端到端联调日志�
 
 ## 测试与人工复核
 
+工作台测试、构建和工具目录一致性检查：
+
+```bash
+cd web
+npm ci
+npm test
+npm run build
+cd ..
+uv run python scripts/export_tool_catalog.py --check
+```
+
+原研究测试与数据人工复核：
+
 ```bash
 uv run pytest -q
 uv run ruff check .
@@ -170,7 +203,9 @@ python scripts/review_dataset.py --split challenge --reviewer YOUR_NAME
 
 ## English summary
 
-FlowSpec compiles Chinese business instructions into a validated workflow DAG. It combines a small language-model compiler with deterministic schema, dependency, tool and permission checks, then executes only inside a side-effect-free simulator. The public demo uses a browser-side fixed compiler and stores no user input.
+FlowSpec is a browser workbench for drafting, inspecting, simulating and handing off workflow plans. Start from templates, limited Chinese rules, manual editing or WorkflowSpec JSON; inspect dependencies and parameters, simulate risk and failures, and approve individual steps. Plans and recent run snapshots are stored in this browser's IndexedDB, with full backup and restore. No cloud sync or real tool execution is provided.
+
+The public site uses browser rules and virtual data, without a language model. Self-hosted use can optionally request a draft from the configured Python compiler. The original Qwen3 training, model artifacts and provisional research metrics remain available; their legacy sandbox pass rates do not validate the newer browser simulator's conditional and failure semantics.
 
 ## License
 

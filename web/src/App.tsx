@@ -1,84 +1,59 @@
-import { useState } from "react";
-import { ArrowRight, BarChart3, Braces, Check, CircleDot, Code2, Cpu, Download, ExternalLink, FlaskConical, GitFork, Play, ShieldCheck, Sparkles } from "lucide-react";
-import { api, CompileResult, Simulation } from "./api";
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, ArrowRight, Check, CloudOff, Copy, Download, FileUp, FlaskConical, FolderOpen, GitFork, LayoutDashboard, ListChecks, LoaderCircle, Pencil, Play, Plus, RotateCcw, Search, Sparkles, Trash2 } from 'lucide-react';
+import { getTemplate, TEMPLATES, validateWorkflow, type WorkflowNode, type WorkflowSpec } from './workflow-domain';
+import { clonePlan, createPlan, decideRun, serializeBackup, startRun, updatePlan, type Plan } from './workspace';
+import { emptyLibrary, loadLibrary, saveLibrary, type Library } from './workspace-store';
+import { NodeEditor, newNode } from './NodeEditor';
+import { CompileDialog, ImportDialog } from './PlanDialogs';
+import { ChecksView, DeliveryView, EditorView, RunView, SettingsDialog } from './PlanViews';
+import { date, downloadFile, ErrorMessage, Modal } from './ui';
+import { Research } from './Research';
 
-const examples=[
-  "每周一汇总上周客户反馈，按产品模块分类；高风险问题先让负责人确认，再生成周报并发到产品群。失败时重试两次。",
-  "搜索产品知识并生成报告，确认后通过邮件发送。",
-  "检索用户反馈，识别风险并通知管理员。",
-];
-
-const benchmarkRows=[
-  {name:"ZERO-SHOT",dataset:"标准集 · 250",schema:"66.8%",dag:"66.8%",sandbox:"50.0%",tool:"0.251",argument:"0.002",edge:"0.000",semantic:"0.084"},
-  {name:"FEW-SHOT + VALIDATOR",dataset:"标准集 · 250",schema:"85.2%",dag:"85.2%",sandbox:"85.2%",tool:"0.706",argument:"0.719",edge:"0.595",semantic:"0.674"},
-  {name:"QLORA + VALIDATOR",dataset:"标准集 · 250",schema:"100%",dag:"100%",sandbox:"100%",tool:"0.856",argument:"0.844",edge:"0.680",semantic:"0.793",best:true},
-  {name:"QLORA / UNSEEN",dataset:"挑战集 · 100",schema:"100%",dag:"100%",sandbox:"100%",tool:"0.818",argument:"0.801",edge:"0.376",semantic:"0.665"},
-];
-
-export function App(){
-  const [instruction,setInstruction]=useState(examples[0]);
-  const [result,setResult]=useState<CompileResult|null>(null);
-  const [simulation,setSimulation]=useState<Simulation|null>(null);
-  const [busy,setBusy]=useState(false); const [error,setError]=useState("");
-  const compile=async()=>{setBusy(true);setError("");setSimulation(null);try{setResult(await api.compile(instruction));}catch(e){setError(e instanceof Error?e.message:"未知错误");}finally{setBusy(false);}};
-  const simulate=async()=>{if(!result?.workflow)return;setBusy(true);try{setSimulation(await api.simulate(result.workflow,true));}catch(e){setError(e instanceof Error?e.message:"未知错误");}finally{setBusy(false);}};
-  return <div className="app">
-    <header><a className="brand" href="#top"><span>F/</span>FlowSpec</a><div className="status"><i/>SANDBOX ONLY</div><a className="header-result" href="#results"><BarChart3 size={15}/> 实验结果</a><a href="https://github.com/daizhouchen/flowspec-sft"><Code2 size={16}/> GitHub</a></header>
-    <main id="top">
-      <section className="intro"><div><p className="kicker">STRUCTURED AGENT SYSTEMS · 02</p><h1>把一句任务，<br/>编译成可检查的工作流。</h1><p className="lede">自然语言不是执行计划。FlowSpec 将业务描述转换为受 Schema 约束的 DAG，在运行前检查工具、参数、依赖、审批与失败路径。</p></div><div className="protocol"><p>WORKFLOWSPEC / V1.0</p><pre>{`instruction\n   ↓ compile\nJSON DAG\n   ↓ validate\nsandbox trace`}</pre><span><ShieldCheck size={15}/> 无真实外部写操作</span></div></section>
-      <section className="lab">
-        <div className="input-pane"><div className="pane-title"><span>01</span><div><p>INPUT</p><h2>描述任务</h2></div></div><textarea value={instruction} maxLength={600} onChange={e=>setInstruction(e.target.value)}/><div className="input-meta"><span>{instruction.length}/600</span><button onClick={compile} disabled={busy||instruction.length<4}><Sparkles size={16}/>{busy?"编译中":"编译工作流"}</button></div><div className="examples">{examples.map((x,i)=><button key={x} onClick={()=>setInstruction(x)}>示例 {i+1}<ArrowRight size={12}/></button>)}</div>
-          <div className="guardrails"><div><Braces size={16}/><span>JSON Schema</span></div><div><GitFork size={16}/><span>DAG 检查</span></div><div><CircleDot size={16}/><span>单次修复</span></div></div>
-        </div>
-        <div className="output-pane"><div className="pane-title"><span>02</span><div><p>OUTPUT</p><h2>工作流图</h2></div>{result&&<b className={result.validation.valid?"ok":"bad"}>{result.validation.valid?"VALID":"INVALID"}</b>}</div>
-          {!result&&<div className="empty"><Cpu size={30}/><p>等待编译</p><span>生成结果会在这里展示节点、依赖和校验状态。</span></div>}
-          {result?.workflow&&<><div className="flow">{result.workflow.nodes.map((node,i)=><div className="flow-row" key={node.id}>{i>0&&<div className="connector"/>}<article><span>{String(i+1).padStart(2,"0")}</span><div><small>{node.id}</small><h3>{node.tool}</h3><p>{node.depends_on.length?`依赖 ${node.depends_on.join(", ")}`:"入口节点"}{node.when?` · ${node.when}`:""}</p></div>{node.requires_approval&&<em>APPROVAL</em>}</article></div>)}</div>
-            <div className="validation"><div><Check size={15}/><span>Schema {result.validation.schema_valid?"通过":"失败"}</span></div><div><Check size={15}/><span>DAG {result.validation.dag_valid?"通过":"失败"}</span></div><div><span>{result.elapsed_ms} ms · {result.compiler}</span></div></div>
-            <button className="simulate" onClick={simulate} disabled={busy}><Play size={15}/>在沙箱中模拟</button></>}
-          {simulation&&<div className="trace"><div><strong>执行轨迹</strong><span>{simulation.status} · {simulation.elapsed_ms} ms</span></div>{simulation.trace.map(step=><p key={step.node_id}><i/><b>{step.node_id}</b><span>{step.message}</span></p>)}</div>}
-          {error&&<p className="error">{error}</p>}
-        </div>
-      </section>
-      <section className="results" id="results">
-        <div className="results-heading">
-          <div><p className="kicker">WHAT WAS PROVEN · QWEN3-1.7B</p><h2>这个项目，究竟验证了什么？</h2><p className="results-lede">它不是一个聊天机器人，而是一层“执行前检查”：把模糊的业务要求整理成步骤，补上审批、重试和失败处理，再确认流程能够安全运行。</p></div>
-          <div className="results-summary"><FlaskConical size={20}/><div><strong>350</strong><span>条固定任务用于最终测试</span></div></div>
-        </div>
-        <div className="plain-flow">
-          <article><span>01</span><div><strong>你说一句业务要求</strong><p>例如“每周汇总客户反馈，高风险问题先由负责人确认，再发送周报”。</p></div></article>
-          <ArrowRight size={18}/>
-          <article><span>02</span><div><strong>模型拆成可执行步骤</strong><p>自动选择工具，安排先后关系，并识别需要人工确认的位置。</p></div></article>
-          <ArrowRight size={18}/>
-          <article><span>03</span><div><strong>规则系统先做安全检查</strong><p>发现参数缺失、循环依赖或未知工具时先修复或拦截，不直接执行。</p></div></article>
-        </div>
-        <div className="result-highlights">
-          <article><span>能否运行</span><strong>250 / 250</strong><p>常规测试任务全部生成了结构完整、可以进入沙箱运行的工作流。</p></article>
-          <article><span>是否理解任务</span><strong>79.3<small>分</small></strong><p>工具选择、参数填写和步骤依赖的综合得分，较提示词方案提升 11.9 分。</p></article>
-          <article><span>遇到新组合</span><strong>100 / 100</strong><p>面对训练中没见过的工具组合，全部通过格式与流程结构检查。</p></article>
-        </div>
-        <details className="technical-results">
-          <summary><span><BarChart3 size={17}/>查看完整技术指标与四组对照实验</span><small>适合技术面试与复现</small></summary>
-          <div className="benchmark-card">
-            <div className="benchmark-title"><div><BarChart3 size={17}/><span>固定评测对照</span></div><em>STRUCTURE ≠ SEMANTICS</em></div>
-            <div className="benchmark-scroll">
-              <table>
-                <thead><tr><th>方案</th><th>Schema</th><th>DAG</th><th>沙箱</th><th>工具 F1</th><th>参数 F1</th><th>依赖边 F1</th><th>语义结构</th></tr></thead>
-                <tbody>{benchmarkRows.map(row=><tr className={row.best?"best":undefined} key={row.name}><td><b>{row.name}</b><small>{row.dataset}</small></td><td>{row.schema}</td><td>{row.dag}</td><td>{row.sandbox}</td><td>{row.tool}</td><td>{row.argument}</td><td>{row.edge}</td><td><strong>{row.semantic}</strong></td></tr>)}</tbody>
-              </table>
-            </div>
-            <p className="metric-note">语义结构 = 工具、参数槽位与依赖边 F1 的均值。挑战集使用训练阶段未出现的工具组合。</p>
-          </div>
-          <div className="experiment-meta">
-            <div><span>BASE</span><strong>Qwen3-1.7B</strong></div><div><span>METHOD</span><strong>4-bit QLoRA · r16</strong></div><div><span>DATA</span><strong>1,600 / 250 / 250 / 100</strong></div><div><span>TRAIN</span><strong>2 epochs · 200 steps</strong></div><div><span>LOSS</span><strong>0.0221 / 0.1914</strong></div><div><span>VRAM</span><strong>4.276 GiB peak</strong></div>
-          </div>
-        </details>
-        <div className="artifact-callout">
-          <div><Download size={22}/><div><span>REPRODUCIBLE ARTIFACTS</span><h3>模型、Adapter 与逐样本证据已公开</h3><p>下载 GGUF Q4_K_M、QLoRA Adapter、SHA-256 校验文件，以及 zero-shot / few-shot / 消融 / 最终模型的逐样本预测与精选日志。</p></div></div>
-          <div className="artifact-actions"><a className="primary" href="https://github.com/daizhouchen/flowspec-sft/releases/tag/v1.0.0-models" target="_blank" rel="noreferrer"><Download size={15}/>下载模型</a><a href="https://github.com/daizhouchen/flowspec-sft/blob/main/reports/experiment-summary.md" target="_blank" rel="noreferrer"><ExternalLink size={14}/>完整报告</a></div>
-        </div>
-        <p className="provisional"><i/>以上结果来自原创合成任务，人工逐条复核完成前标记为阶段性结果。当前网页使用浏览器侧演示编译器；真实量化模型已在远程服务器完成从推理接口、规则校验到沙箱执行的完整联调。</p>
-      </section>
-      <section className="principles"><p className="kicker">DESIGN PRINCIPLES</p><div><article><span>01</span><h3>先校验，再执行</h3><p>模型输出必须通过结构、依赖和工具参数检查。</p></article><article><span>02</span><h3>模型与规则协同</h3><p>格式问题由确定性规则修复，语义错误只反馈一次。</p></article><article><span>03</span><h3>结果可测量</h3><p>用合法率、参数 F1 和沙箱通过率评价，而不是只看 Loss。</p></article></div></section>
-    </main><footer><span>FlowSpec · Natural language → validated DAG</span><span>Dai Zhouchen · 2026</span></footer>
+type Tab = 'edit' | 'checks' | 'run' | 'delivery';
+type Popup = { type: 'compile'; replacing?: boolean } | { type: 'import' } | { type: 'node'; node: WorkflowNode; adding?: boolean } | { type: 'settings' } | { type: 'delete'; plan: Plan } | { type: 'reload' };
+export function App() {
+  const [library, setLibrary] = useState<Library>(emptyLibrary); const [ready, setReady] = useState(false); const [loadError, setLoadError] = useState(''); const [loadAttempt, setLoadAttempt] = useState(0);
+  const [saveState, setSaveState] = useState<'saved' | 'pending' | 'error'>('saved'); const [saveError, setSaveError] = useState(''); const [notice, setNotice] = useState(''); const [tab, setTab] = useState<Tab>('edit'); const [popup, setPopup] = useState<Popup | null>(null); const [query, setQuery] = useState('');
+  const [research, setResearch] = useState(location.hash === '#research');
+  const latest = useRef(library), dirty = useRef(false), generation = useRef(0), timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const plan = library.plans.find(p => p.id === library.selectedId);
+  useEffect(() => { const sync = () => setResearch(location.hash === '#research'); addEventListener('hashchange', sync); return () => removeEventListener('hashchange', sync); }, []);
+  useEffect(() => { let cancelled = false; setLoadError(''); loadLibrary().then(value => { if (!cancelled) { latest.current = value; setLibrary(value); setReady(true); const selected = value.plans.find(p => p.id === value.selectedId); if (selected?.activeRunId) setTab('run'); } }).catch(e => { if (!cancelled) setLoadError(e instanceof Error ? e.message : '无法读取本机方案。'); }); return () => { cancelled = true; }; }, [loadAttempt]);
+  async function persist(snapshot = latest.current, token = generation.current) {
+    setSaveState('pending');
+    try { await saveLibrary(snapshot); if (token === generation.current) { dirty.current = false; setSaveState('saved'); setSaveError(''); } }
+    catch (e) { if (token === generation.current) { dirty.current = true; setSaveState('error'); setSaveError(e instanceof Error ? e.message : '保存失败，请先下载备份。'); } }
+  }
+  function change(next: Library) { latest.current = next; setLibrary(next); dirty.current = true; generation.current++; setSaveState('pending'); setSaveError(''); if (timer.current) clearTimeout(timer.current); const token = generation.current; timer.current = setTimeout(() => { timer.current = null; void persist(next, token); }, 250); }
+  useEffect(() => { const warn = (event: BeforeUnloadEvent) => { if (dirty.current) { event.preventDefault(); event.returnValue = ''; } }; addEventListener('beforeunload', warn); return () => { removeEventListener('beforeunload', warn); if (timer.current) { clearTimeout(timer.current); timer.current = null; void saveLibrary(latest.current).catch(() => undefined); } }; }, []);
+  function select(id: string | null) { change({ ...latest.current, selectedId: id }); const p = latest.current.plans.find(p => p.id === id); setTab(p?.activeRunId ? 'run' : 'edit'); setNotice(''); }
+  function add(p: Plan) { if (latest.current.plans.length >= 30) throw new Error('本机方案已达 30 份。请先备份并删除不再使用的方案。'); serializeBackup(p); change({ ...latest.current, plans: [p, ...latest.current.plans], selectedId: p.id }); setTab(p.activeRunId ? 'run' : 'edit'); setNotice(''); }
+  function replace(p: Plan) { serializeBackup(p); change({ ...latest.current, plans: latest.current.plans.map(item => item.id === p.id ? p : item) }); }
+  function protect(action: () => void) { try { action(); setNotice(''); } catch (e) { setNotice(e instanceof Error ? e.message : '操作未完成'); } }
+  function backup(p: Plan) { protect(() => downloadFile(`${p.title}-完整备份.json`, serializeBackup(p), 'application/json')); }
+  function fromTemplate(id: string) { protect(() => { const item = TEMPLATES.find(t => t.id === id)!; add(createPlan(getTemplate(id), { title: item.title, brief: item.instruction, origin: 'template', notes: ['使用可编辑示例，所有输出为沙箱模拟；请检查目标群、收件人等默认参数。'] })); }); }
+  function blank() { protect(() => { const workflow: WorkflowSpec = { schema_version: '1.0', name: 'new_workflow', description: '请填写这份流程预期得到的结果。', trigger: { type: 'manual' }, nodes: [{ id: 'step_1', tool: 'knowledge.search', arguments: {}, depends_on: [], requires_approval: false, retry: { max_attempts: 0, backoff_seconds: 0 }, when: null, on_failure: null }] }; add(createPlan(workflow, { title: '我的新方案', origin: 'manual', notes: ['从一个检索步骤起步，请选择工具并补全参数。'] })); }); }
+  const nav = [{ id: 'edit' as const, title: '编排流程', sub: '步骤与数据', icon: GitFork }, { id: 'checks' as const, title: '检查与修正', sub: '问题与定位', icon: ListChecks }, { id: 'run' as const, title: '沙箱试跑', sub: '审批与例外', icon: Play }, { id: 'delivery' as const, title: '交付与记录', sub: '导出与回看', icon: Download }];
+  const check = plan ? validateWorkflow(plan.workflow) : null;
+  return <div className="fs-app"><header className="topbar"><a className="brand" href="#" onClick={e => { if (!research) { e.preventDefault(); if (ready) select(null); } }}><span className="brand-mark">F/</span><strong>FlowSpec</strong><small>工作流方案台</small></a><div className={`save-state ${saveState}`} role="status">{!ready ? <><LoaderCircle/>读取本机方案</> : saveState === 'saved' ? <><Check/>已保存到此浏览器</> : saveState === 'pending' ? <><LoaderCircle/>正在保存…</> : <><CloudOff/>修改尚未保存</>}</div><div className="top-links"><a href={research ? '#' : '#research'}><FlaskConical/>{research ? '返回工作台' : '研究与模型'}</a><a href="https://daizhouchen.github.io/">作品集 ↗</a></div></header>
+    {research && <Research/>}<div hidden={research}>
+      {!ready && <main className="library"><div className="empty-state"><FolderOpen/><h1>{loadError ? '暂时无法读取本机方案' : '正在打开工作台'}</h1>{loadError && <><ErrorMessage message={loadError}/><p>读取成功前不会覆盖已有记录。</p><button className="secondary" onClick={() => setLoadAttempt(v => v + 1)}><RotateCcw/>重新读取</button></>}</div></main>}
+      {ready && <>
+        {(saveError || notice) && <div className="global-notices">{saveError && <div className="error-panel" role="alert"><p>{saveError}</p><div className="actions"><button className="secondary" onClick={() => void persist()}><RotateCcw/>重试保存</button>{plan && <button className="secondary" onClick={() => backup(plan)}><Download/>备份当前方案</button>}{saveError.includes('标签') && <button className="secondary" onClick={() => setPopup({ type: 'reload' })}>载入最新本机记录</button>}</div></div>}{notice && <div className="notice" role="status">{notice}<button className="quiet" onClick={() => setNotice('')}>收起</button></div>}</div>}
+        {!plan ? <main className="library"><section className="library-hero"><div><span className="eyebrow">DESIGN IT. CHECK IT. TRY THE EXCEPTIONS.</span><h1>在接入真实工具前，<br/>把流程想清楚。</h1><p>给产品与开发者的工作流方案台。整理业务步骤，检查参数和依赖，再用不同情境试跑审批、重试与失败路径。</p><div className="actions"><button className="primary" onClick={() => setPopup({ type: 'compile' })}><Sparkles/>从需求开始</button><button className="secondary" onClick={blank}><Plus/>手动搭建</button></div><span className="local-note">本机保存 · 浏览器规则起草 · 全程虚拟工具</span></div><aside className="hero-route"><span className="eyebrow">一份可交付的方案</span>{[['01', '先说明要完成什么', '从完整示例或你的业务需求开始'], ['02', '把隐含条件摆到台面上', '看参数、依赖、审批和失败策略'], ['03', '带着结果继续工作', '试跑例外，导出流程与交接记录']].map(([n,t,d]) => <div key={n}><b>{n}</b><span><strong>{t}</strong><small>{d}</small></span></div>)}</aside></section>
+          <section className="templates-section"><div className="section-heading"><div><span className="eyebrow">START WITH A COMPLETE SCENARIO</span><h2>先走通一份完整方案</h2></div><span className="muted">示例参数均可修改</span></div><div className="template-grid">{TEMPLATES.map((t, i) => <button key={t.id} className="template-card" onClick={() => fromTemplate(t.id)}><span className="template-no">0{i + 1} / TEMPLATE</span><h3>{t.title}</h3><p>{t.description}</p><span className="template-open">用此方案开始<ArrowRight/></span></button>)}</div></section>
+          <section className="plans-section"><div className="section-heading"><div><span className="eyebrow">YOUR WORKSPACE</span><h2>我的方案 <small>{library.plans.length ? ` / ${library.plans.length}` : ''}</small></h2></div><button className="secondary" onClick={() => setPopup({ type: 'import' })}><FileUp/>导入 / 恢复</button></div>{!!library.plans.length && <label className="search-field"><Search/><input aria-label="搜索我的方案" placeholder="按名称或需求查找" value={query} onChange={e => setQuery(e.target.value)}/></label>}<div className="plan-list">{!library.plans.length && <div className="empty-state"><FolderOpen/><h3>第一份方案，从一个具体任务开始。</h3><p>选择上方示例，或导入你已有的 WorkflowSpec JSON。</p></div>}{library.plans.filter(p => `${p.title} ${p.brief}`.includes(query)).map(p => <article className="plan-row" key={p.id}><span className="plan-symbol"><GitFork/></span><div><h3>{p.title}</h3><p>{p.workflow.nodes.length} 个步骤 · R{p.revision} · {p.runs.length} 次试跑 · {date(p.updatedAt)}</p></div><div className="actions"><button className="primary" onClick={() => select(p.id)}>继续方案<ArrowRight/></button><button className="icon-button" aria-label={`备份 ${p.title}`} onClick={() => backup(p)}><Download/></button><button className="icon-button" aria-label={`删除 ${p.title}`} onClick={() => setPopup({ type: 'delete', plan: p })}><Trash2/></button></div></article>)}{!!library.plans.length && !library.plans.some(p => `${p.title} ${p.brief}`.includes(query)) && <div className="empty-state"><p>没有匹配的方案。</p><button className="secondary" onClick={() => setQuery('')}>清除筛选</button></div>}</div></section></main> : <main className="project-shell"><aside className="project-nav"><button className="back-button" onClick={() => select(null)}><ArrowLeft/>我的方案</button><div className="nav-project"><span className="eyebrow">CURRENT PLAN</span><h2>{plan.title}</h2><p>方案 R{plan.revision}</p></div><nav aria-label="方案工作步骤">{nav.map((item, i) => <button key={item.id} aria-current={tab === item.id ? 'page' : undefined} onClick={() => { setTab(item.id); setNotice(''); }}><item.icon/><span><strong>{item.title}</strong><small>{item.sub}</small></span><b>0{i + 1}</b></button>)}</nav><div className="nav-note"><span className="live-dot"/><p>所有工具均为模拟。<br/>定时、通知与审批在此只做方案验证。</p></div></aside><section className="project-main"><header className="project-heading"><div><span className="eyebrow">WORKSPACE / {plan.workflow.name}</span><h1>{plan.title}</h1><p>{plan.workflow.nodes.length} 个步骤 · {check?.valid ? '结构检查通过' : `${check?.issues.filter(i => i.level === 'error').length} 项问题待修正`}</p></div><details className="plan-menu"><summary>方案操作</summary><div><button onClick={() => setPopup({ type: 'settings' })}><Pencil/>编辑说明</button><button onClick={() => setPopup({ type: 'compile', replacing: true })}><Sparkles/>根据需求重新起草</button><button onClick={() => protect(() => add(clonePlan(plan)))}><Copy/>复制为新方案</button><button onClick={() => backup(plan)}><Download/>下载完整备份</button><button onClick={() => setPopup({ type: 'delete', plan })}><Trash2/>删除方案</button></div></details></header>
+          {!!plan.notes.length && <details className="origin-notes"><summary>起草时的理解与假设 · {plan.origin}</summary><ul>{plan.notes.map((s, i) => <li key={i}>{s}</li>)}</ul></details>}
+          <div className="view-content" key={`${plan.id}-${tab}`}>{tab === 'edit' && <EditorView plan={plan} editNode={id => setPopup({ type: 'node', node: plan.workflow.nodes.find(n => n.id === id)! })} addNode={() => setPopup({ type: 'node', node: newNode(plan.workflow), adding: true })} editSettings={() => setPopup({ type: 'settings' })} next={() => setTab('checks')}/>}{tab === 'checks' && <ChecksView plan={plan} editNode={id => setPopup({ type: 'node', node: plan.workflow.nodes.find(n => n.id === id)! })} editSettings={() => setPopup({ type: 'settings' })} next={() => setTab('run')}/>}{tab === 'run' && <RunView plan={plan} start={s => replace(startRun(plan, s))} decide={(id, d) => replace(decideRun(plan, id, d))} checkFirst={() => setTab('checks')}/>}{tab === 'delivery' && <DeliveryView plan={plan}/>}</div>
+        </section></main>}
+        <footer className="site-footer"><span>项目只保存在当前浏览器，请定期下载完整备份。</span><a href="https://github.com/daizhouchen/flowspec-sft" target="_blank" rel="noreferrer">WorkflowSpec · 源码与复现 ↗</a></footer>
+      </>}
+    </div>
+    {popup?.type === 'compile' && <CompileDialog initial={popup.replacing ? plan?.brief : ''} replacing={popup.replacing} close={() => setPopup(null)} commit={(proposal, brief) => { if (popup.replacing && plan) replace({ ...updatePlan(plan, { brief, workflow: proposal.workflow }), origin: proposal.source, notes: [...proposal.recognition, ...proposal.assumptions, ...proposal.unhandled] }); else add(createPlan(proposal.workflow, { title: brief.slice(0, 32), brief, origin: proposal.source, notes: [...proposal.recognition, ...proposal.assumptions, ...proposal.unhandled] })); setPopup(null); setTab('edit'); }}/>}
+    {popup?.type === 'import' && <ImportDialog close={() => setPopup(null)} commit={p => { add(p); setPopup(null); }}/>}
+    {popup?.type === 'settings' && plan && <SettingsDialog plan={plan} close={() => setPopup(null)} save={(title, brief, workflow) => { replace(updatePlan(plan, { title, brief, workflow })); setPopup(null); }}/>}
+    {popup?.type === 'node' && plan && <NodeEditor node={popup.node} adding={popup.adding} workflow={plan.workflow} close={() => setPopup(null)} save={node => { replace(updatePlan(plan, { workflow: { ...plan.workflow, nodes: popup.adding ? [...plan.workflow.nodes, node] : plan.workflow.nodes.map(n => n.id === node.id ? node : n) } })); setPopup(null); }} remove={() => { protect(() => { replace(updatePlan(plan, { workflow: { ...plan.workflow, nodes: plan.workflow.nodes.filter(n => n.id !== popup.node.id) } })); setPopup(null); }); }}/>}
+    {popup?.type === 'delete' && <Modal title={`删除「${popup.plan.title}」？`} close={() => setPopup(null)}><p>这会从此浏览器移除方案与 {popup.plan.runs.length} 条试跑记录。可以先下载完整备份。</p><button className="secondary" onClick={() => backup(popup.plan)}><Download/>先备份方案</button><div className="modal-actions"><button className="secondary" onClick={() => setPopup(null)}>保留方案</button><button className="danger" onClick={() => { const id = popup.plan.id; change({ ...latest.current, plans: latest.current.plans.filter(p => p.id !== id), selectedId: latest.current.selectedId === id ? null : latest.current.selectedId }); setPopup(null); }}>确认删除方案</button></div></Modal>}
+    {popup?.type === 'reload' && <Modal title="载入最新本机记录？" close={() => setPopup(null)}><p>本页尚未保存的修改会被放弃。请先备份当前方案，再载入其他标签页保存的版本；备份可恢复为独立副本。</p>{plan && <button className="secondary" onClick={() => backup(plan)}>备份当前方案</button>}<div className="modal-actions"><button className="secondary" onClick={() => setPopup(null)}>留在此页</button><button className="danger" onClick={() => { dirty.current = false; location.reload(); }}>放弃本页修改并载入</button></div></Modal>}
   </div>;
 }

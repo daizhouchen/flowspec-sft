@@ -1,0 +1,311 @@
+[
+  {
+    "name": "knowledge.search",
+    "category": "retrieval",
+    "description": "检索知识库",
+    "parameters": {
+      "query": {
+        "type": "string",
+        "required": true,
+        "description": "检索问题"
+      },
+      "top_k": {
+        "type": "integer",
+        "required": false,
+        "description": "返回数量"
+      }
+    },
+    "risk": "read"
+  },
+  {
+    "name": "feedback.search",
+    "category": "retrieval",
+    "description": "检索客户反馈",
+    "parameters": {
+      "date_range": {
+        "type": "string",
+        "required": true,
+        "description": "日期范围"
+      },
+      "product": {
+        "type": "string",
+        "required": false,
+        "description": "产品模块"
+      }
+    },
+    "risk": "read"
+  },
+  {
+    "name": "records.lookup",
+    "category": "retrieval",
+    "description": "查询业务记录",
+    "parameters": {
+      "record_type": {
+        "type": "string",
+        "required": true,
+        "description": "记录类型"
+      },
+      "filter": {
+        "type": "object",
+        "required": false,
+        "description": "筛选条件"
+      }
+    },
+    "risk": "read"
+  },
+  {
+    "name": "text.classify",
+    "category": "classification",
+    "description": "文本分类",
+    "parameters": {
+      "labels": {
+        "type": "array",
+        "required": true,
+        "description": "分类标签"
+      },
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      }
+    },
+    "risk": "compute"
+  },
+  {
+    "name": "risk.classify",
+    "category": "classification",
+    "description": "识别风险等级",
+    "parameters": {
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      },
+      "threshold": {
+        "type": "string",
+        "required": false,
+        "description": "风险阈值"
+      }
+    },
+    "risk": "compute"
+  },
+  {
+    "name": "sentiment.analyze",
+    "category": "classification",
+    "description": "情感分析",
+    "parameters": {
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      }
+    },
+    "risk": "compute"
+  },
+  {
+    "name": "text.summarize",
+    "category": "transformation",
+    "description": "生成摘要",
+    "parameters": {
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      },
+      "max_words": {
+        "type": "integer",
+        "required": false,
+        "description": "最大字数"
+      }
+    },
+    "risk": "compute"
+  },
+  {
+    "name": "data.aggregate",
+    "category": "transformation",
+    "description": "聚合结构化数据",
+    "parameters": {
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      },
+      "group_by": {
+        "type": "string",
+        "required": false,
+        "description": "分组字段"
+      }
+    },
+    "risk": "compute"
+  },
+  {
+    "name": "content.translate",
+    "category": "transformation",
+    "description": "翻译内容",
+    "parameters": {
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      },
+      "target_language": {
+        "type": "string",
+        "required": true,
+        "description": "目标语言"
+      }
+    },
+    "risk": "compute"
+  },
+  {
+    "name": "report.generate",
+    "category": "reporting",
+    "description": "生成报告",
+    "parameters": {
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      },
+      "template": {
+        "type": "string",
+        "required": false,
+        "description": "报告模板"
+      }
+    },
+    "risk": "compute"
+  },
+  {
+    "name": "chart.render",
+    "category": "reporting",
+    "description": "生成图表",
+    "parameters": {
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      },
+      "chart_type": {
+        "type": "string",
+        "required": true,
+        "description": "图表类型"
+      }
+    },
+    "risk": "compute"
+  },
+  {
+    "name": "document.export",
+    "category": "reporting",
+    "description": "导出文档",
+    "parameters": {
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      },
+      "format": {
+        "type": "string",
+        "required": true,
+        "description": "文档格式"
+      }
+    },
+    "risk": "compute"
+  },
+  {
+    "name": "human.approval",
+    "category": "approval",
+    "description": "请求人工确认",
+    "parameters": {
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      },
+      "assignee": {
+        "type": "string",
+        "required": false,
+        "description": "确认人"
+      }
+    },
+    "risk": "approval"
+  },
+  {
+    "name": "legal.review",
+    "category": "approval",
+    "description": "请求法务审核",
+    "parameters": {
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      }
+    },
+    "risk": "approval"
+  },
+  {
+    "name": "manager.approval",
+    "category": "approval",
+    "description": "请求负责人审批",
+    "parameters": {
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      },
+      "role": {
+        "type": "string",
+        "required": false,
+        "description": "负责人角色"
+      }
+    },
+    "risk": "approval"
+  },
+  {
+    "name": "message.send",
+    "category": "notification",
+    "description": "发送群消息",
+    "parameters": {
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      },
+      "channel": {
+        "type": "string",
+        "required": true,
+        "description": "目标群"
+      }
+    },
+    "risk": "notify"
+  },
+  {
+    "name": "email.send",
+    "category": "notification",
+    "description": "发送邮件",
+    "parameters": {
+      "input_from": {
+        "type": "string",
+        "required": true,
+        "description": "上游节点"
+      },
+      "recipient": {
+        "type": "string",
+        "required": true,
+        "description": "收件人"
+      }
+    },
+    "risk": "notify"
+  },
+  {
+    "name": "admin.notify",
+    "category": "notification",
+    "description": "通知管理员",
+    "parameters": {
+      "message": {
+        "type": "string",
+        "required": true,
+        "description": "通知内容"
+      }
+    },
+    "risk": "notify"
+  }
+]
